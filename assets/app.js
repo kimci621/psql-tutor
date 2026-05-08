@@ -1,6 +1,7 @@
 import { highlightSQL } from "./sql-highlight.js?v=2";
 import { initChat } from "./chat.js?v=4";
 import { loadTheme, saveTheme } from "./settings.js";
+import { findTrackContext, resolveHref } from "./tracks.js?v=1";
 
 function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
@@ -58,6 +59,77 @@ function initActiveNav() {
     const href = a.getAttribute("href") || "";
     if (href.endsWith(here)) a.classList.add("active");
   });
+}
+
+// Текущий путь страницы относительно корня сайта (без ведущего слеша).
+// Учитывает подкаталог guides/.
+function currentPagePath() {
+  const path = location.pathname.replace(/\/$/, "/index.html");
+  const parts = path.split("/").filter(Boolean);
+  if (parts.length === 0) return "index.html";
+  if (parts[parts.length - 2] === "guides") {
+    return "guides/" + parts[parts.length - 1];
+  }
+  return parts[parts.length - 1];
+}
+
+// Вставляем хлебные крошки под топбаром и блок «Дальше / Назад» в конце main.
+// Порядок страниц берётся из tracks.js. Если страница не входит ни в один трек,
+// блоки не отрисовываются.
+function initTrackNavigation() {
+  const main = document.querySelector("main.main");
+  if (!main) return;
+  const here = currentPagePath();
+  const ctx = findTrackContext(here);
+  if (!ctx) return;
+
+  // Хлебные крошки.
+  const pageTitleEl = main.querySelector(".page-title");
+  const homeHref = resolveHref("index.html", here);
+  const crumbs = document.createElement("nav");
+  crumbs.className = "breadcrumbs";
+  crumbs.setAttribute("aria-label", "Хлебные крошки");
+  const last = ctx.track.pages[ctx.index];
+  crumbs.innerHTML =
+    `<a href="${homeHref}">Главная</a>` +
+    `<span class="sep" aria-hidden="true">›</span>` +
+    `<span class="track-name">Трек: ${escapeHtml(ctx.track.title)}</span>` +
+    `<span class="sep" aria-hidden="true">›</span>` +
+    `<span class="current" aria-current="page">${escapeHtml(last.title)}</span>`;
+  if (pageTitleEl) {
+    pageTitleEl.parentNode.insertBefore(crumbs, pageTitleEl);
+  } else {
+    main.insertBefore(crumbs, main.firstChild);
+  }
+
+  // Прячем текстовый crumb в топбаре, чтобы не дублировать.
+  const topbarCrumbs = main.querySelector(".topbar .crumbs");
+  if (topbarCrumbs) topbarCrumbs.style.visibility = "hidden";
+
+  // Блок «Дальше / Назад».
+  const nav = document.createElement("nav");
+  nav.className = "track-nav";
+  nav.setAttribute("aria-label", "Навигация по треку");
+  const prevHtml = ctx.prev
+    ? `<a class="prev" href="${resolveHref(ctx.prev.href, here)}" rel="prev">
+         <span class="label">← Назад</span>
+         <span class="title">${escapeHtml(ctx.prev.title)}</span>
+       </a>`
+    : `<span class="prev placeholder" aria-hidden="true"></span>`;
+  const nextHtml = ctx.next
+    ? `<a class="next" href="${resolveHref(ctx.next.href, here)}" rel="next">
+         <span class="label">Дальше →</span>
+         <span class="title">${escapeHtml(ctx.next.title)}</span>
+       </a>`
+    : `<span class="next placeholder" aria-hidden="true"></span>`;
+  nav.innerHTML = prevHtml + nextHtml;
+  main.appendChild(nav);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
 }
 
 function injectChatPanel() {
@@ -125,5 +197,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   initCodeBlocks();
   initActiveNav();
+  initTrackNavigation();
   initChat();
 });
