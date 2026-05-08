@@ -177,7 +177,7 @@ CREATE TABLE events (
           </div>
         </div>
         <div class="desc">
-          <p><code>uuid</code> хранится в 16 байтах (а не 36 символов канонического вида). Индексы по uuid в 1.5–2 раза больше, чем по <code>bigint</code>; vt v4 ещё и плохо ложится в B-tree из-за случайности.</p>
+          <p><code>uuid</code> хранится в 16 байтах (а не 36 символов канонического вида). Индексы по uuid в 1.5–2 раза больше, чем по <code>bigint</code>; UUID v4 ещё и плохо ложится в B-tree из-за случайности.</p>
         </div>
       </article>
 
@@ -218,7 +218,7 @@ SELECT replace(
               <tr><td>Объёмы данных</td><td>Десятки ГБ, иногда ТБ</td><td>ТБ–ПБ</td></tr>
               <tr><td>Структура</td><td>Нормализованная</td><td>Денормализация, звёздная схема</td></tr>
               <tr><td>Хранилище</td><td>Postgres, MySQL</td><td>ClickHouse, BigQuery, DuckDB, Snowflake</td></tr>
-              <tr><td>На Postgres</td><td>Прекрасно</td><td>До определённого объёма; дальше — отдельный movemen</td></tr>
+              <tr><td>На Postgres</td><td>Прекрасно</td><td>До определённого объёма; дальше — отдельный движок</td></tr>
             </tbody>
           </table>
           <p>Часто на проде ставят реплику Postgres под аналитические запросы, чтобы не мешать «горячему» OLTP. Для time-series — TimescaleDB поверх Postgres.</p>
