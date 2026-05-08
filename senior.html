@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Senior-уровень PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Senior</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Senior-уровень: производительность, эксплуатация, безопасность</h1>
+    <p class="page-lead">
+      Темы, которые отделяют «знаю синтаксис» от «отвечаю за БД в проде».
+      Здесь меньше базового SQL и больше про планировщик, миграции без даунтайма,
+      пулинг, репликацию, RLS и работу Postgres из приложения.
+    </p>
+
+    <!-- ===== Производительность ===== -->
+    <section class="category">
+      <h2>1. Производительность и план запросов</h2>
+      <p class="sub">Чтение планов и поиск тяжёлых запросов.</p>
+
+      <article class="topic" id="sr-explain-deep">
+        <h3>Чтение EXPLAIN ANALYZE</h3>
+        <p class="summary">Узлы плана: Seq Scan, Index Scan, Bitmap, Nested Loop / Hash / Merge Join.</p>
+        <div class="code-block">
+          <pre>EXPLAIN (ANALYZE, BUFFERS, VERBOSE)
+SELECT u.email, count(o.id)
+FROM   users u
+LEFT JOIN orders o ON o.user_id = u.id
+GROUP  BY u.email;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-explain-deep">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Сравнивай <code>actual rows</code> и <code>rows estimated</code>. Большая разница — устаревшая статистика или сложный предикат. <code>BUFFERS</code> покажет, сколько страниц прочитано из shared buffers и с диска.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-pg-stat-statements">
+        <h3>pg_stat_statements — top тяжёлых запросов</h3>
+        <p class="summary">Главный инструмент поиска того, что реально жрёт CPU и I/O.</p>
+        <div class="code-block">
+          <pre>CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+SELECT round(total_exec_time::numeric, 1) AS total_ms,
+       calls,
+       round(mean_exec_time::numeric, 2)  AS mean_ms,
+       round((100 * total_exec_time / sum(total_exec_time) OVER ())::numeric, 1) AS pct,
+       query
+FROM   pg_stat_statements
+ORDER  BY total_exec_time DESC
+LIMIT  20;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pg-stat-statements">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Ищи запросы по <code>total_exec_time</code>, а не по среднему: частый дешёвый запрос может быть дороже редкого тяжёлого.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-planner-knobs">
+        <h3>Настройки планировщика</h3>
+        <p class="summary"><code>work_mem</code>, <code>effective_cache_size</code>, <code>random_page_cost</code>.</p>
+        <div class="code-block">
+          <pre>SHOW work_mem;
+SET LOCAL work_mem = '64MB';
+
+-- На SSD имеет смысл понизить:
+ALTER SYSTEM SET random_page_cost = 1.1;
+
+-- Подсказать планировщику размер ОС-кеша:
+ALTER SYSTEM SET effective_cache_size = '12GB';
+SELECT pg_reload_conf();</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-planner-knobs">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>work_mem</code> применяется к <em>каждому</em> узлу-сортировке/хэшу в каждом подключении — не выкручивай глобально, поднимай локально для тяжёлых ETL.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ===== Конкурентность ===== -->
+    <section class="category">
+      <h2>2. Конкурентность и согласованность</h2>
+      <p class="sub">MVCC, advisory locks, шина событий.</p>
+
+      <article class="topic" id="sr-mvcc-snapshot">
+        <h3>MVCC и снимки</h3>
+        <p class="summary">xmin/xmax и видимость строк.</p>
+        <div class="code-block">
+          <pre>SELECT xmin, xmax, * FROM users WHERE id = 1;
+
+SELECT txid_current(), pg_current_snapshot();
+
+-- найти долгие активные транзакции (тормозят VACUUM):
+SELECT pid, age(now(), xact_start) AS age, state, query
+FROM   pg_stat_activity
+WHERE  state &lt;&gt; 'idle'
+ORDER  BY xact_start NULLS LAST
+LIMIT  10;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-mvcc-snapshot">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-advisory-locks">
+        <h3>Advisory locks — прикладные блокировки</h3>
+        <p class="summary">Один воркер на задачу без отдельной таблицы-замка.</p>
+        <div class="code-block">
+          <pre>-- транзакционная: снимется на COMMIT/ROLLBACK
+SELECT pg_try_advisory_xact_lock(hashtext('cron:nightly'));
+
+-- сессионная: нужно явно отпустить
+SELECT pg_advisory_lock(42);
+-- ... работа ...
+SELECT pg_advisory_unlock(42);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-advisory-locks">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-listen-notify">
+        <h3>LISTEN / NOTIFY</h3>
+        <p class="summary">Лёгкая шина событий внутри Postgres.</p>
+        <div class="code-block">
+          <pre>-- подписчик:
+LISTEN order_created;
+
+-- издатель:
+NOTIFY order_created, '{"id": 42}';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-listen-notify">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Сообщения не сохраняются: пропустил подключение — пропустил событие. Хорошо для cache-invalidation; плохо для гарантированной доставки.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-outbox">
+        <h3>Транзакционный outbox</h3>
+        <p class="summary">Атомарность бизнес-операции и публикации события наружу.</p>
+        <div class="code-block">
+          <pre>BEGIN;
+  INSERT INTO orders (user_id, total) VALUES ($1, $2) RETURNING id;
+  INSERT INTO outbox (topic, payload)
+    VALUES ('order_created', jsonb_build_object('id', currval('orders_id_seq')));
+COMMIT;
+
+-- воркер забирает события:
+SELECT id, topic, payload
+FROM   outbox
+WHERE  published_at IS NULL
+ORDER  BY id
+LIMIT  100
+FOR UPDATE SKIP LOCKED;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-outbox">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ===== Миграции и масштабирование ===== -->
+    <section class="category">
+      <h2>3. Миграции и масштабирование</h2>
+      <p class="sub">Без даунтайма, секционирование, репликация.</p>
+
+      <article class="topic" id="sr-zero-downtime-migrations">
+        <h3>Безопасные миграции без даунтайма</h3>
+        <p class="summary">Паттерн <strong>expand → backfill → contract</strong>.</p>
+        <div class="code-block">
+          <pre>-- 1. expand: добавляем новый столбец, код пишет в оба
+ALTER TABLE users ADD COLUMN email_norm text;
+
+-- 2. backfill маленькими батчами
+UPDATE users SET email_norm = lower(email)
+WHERE  id BETWEEN $1 AND $2 AND email_norm IS NULL;
+
+-- 3. ограничения через NOT VALID, потом VALIDATE (без долгой блокировки)
+ALTER TABLE users
+  ADD CONSTRAINT users_email_norm_nn CHECK (email_norm IS NOT NULL) NOT VALID;
+ALTER TABLE users VALIDATE CONSTRAINT users_email_norm_nn;
+
+-- 4. contract: код переходит на email_norm, старый столбец дропается</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-zero-downtime-migrations">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Любой <code>ALTER TABLE</code> с <em>ACCESS EXCLUSIVE</em> выстраивает за собой очередь. Совмести с <code>SET lock_timeout = '2s';</code> — лучше упасть и повторить, чем заморозить прод.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-partitioning">
+        <h3>Декларативное партиционирование</h3>
+        <p class="summary">Большие таблицы разбиваются на партиции по ключу.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE events (
+  id   bigint GENERATED ALWAYS AS IDENTITY,
+  ts   timestamptz NOT NULL,
+  data jsonb,
+  PRIMARY KEY (id, ts)
+) PARTITION BY RANGE (ts);
+
+CREATE TABLE events_2026_05 PARTITION OF events
+  FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+
+CREATE TABLE events_2026_06 PARTITION OF events
+  FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-partitioning">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Старые партиции удаляются <em>мгновенно</em> (<code>DROP TABLE</code>), без VACUUM. Это часто и есть главный мотив секционирования.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-replication">
+        <h3>Репликация: streaming и logical</h3>
+        <p class="summary">Read-replica, failover, выборочная подписка.</p>
+        <div class="code-block">
+          <pre>-- логическая репликация:
+CREATE PUBLICATION app_pub FOR TABLE orders, users;
+
+CREATE SUBSCRIPTION app_sub
+  CONNECTION 'host=primary dbname=app user=repl password=...'
+  PUBLICATION app_pub;
+
+-- лаг физической реплики:
+SELECT now() - pg_last_xact_replay_timestamp() AS lag;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-replication">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Логическая репликация не передаёт DDL — миграции применяй вручную на обеих сторонах. Для автоматического failover в проде используют Patroni.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-pgbouncer">
+        <h3>PgBouncer и пулы соединений</h3>
+        <p class="summary">Pool modes: session / transaction / statement.</p>
+        <div class="code-block">
+          <pre>; pgbouncer.ini
+[databases]
+app = host=127.0.0.1 dbname=app
+
+[pgbouncer]
+pool_mode          = transaction
+max_client_conn    = 5000
+default_pool_size  = 20
+server_reset_query = DISCARD ALL</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pgbouncer">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>В <code>transaction</code>-режиме одно серверное соединение делится между клиентами по транзакциям. Сессионные штуки (<code>LISTEN</code>, временные таблицы, prepared statements) при этом ломаются — учитывай в драйвере.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-backup-pitr">
+        <h3>Бэкапы и PITR</h3>
+        <p class="summary">pg_dump, pg_basebackup и непрерывное архивирование WAL.</p>
+        <div class="code-block">
+          <pre># Логический бэкап одной БД:
+pg_dump -Fc -f /backup/app.dump app
+
+# Физический бэкап кластера:
+pg_basebackup -D /backup/base -X stream -P -R
+
+# Восстановление логического:
+pg_restore -d app /backup/app.dump</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-backup-pitr">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Регулярно <em>проверяй восстановление</em>. Бэкап, который ни разу не разворачивали, — не бэкап. На проде смотри в сторону <code>pgBackRest</code> или <code>WAL-G</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ===== Безопасность ===== -->
+    <section class="category">
+      <h2>4. Безопасность</h2>
+      <p class="sub">RLS, безопасные функции, prepared statements.</p>
+
+      <article class="topic" id="sr-rls">
+        <h3>Row-Level Security</h3>
+        <p class="summary">Политики доступа на уровне строк — основа multi-tenant.</p>
+        <div class="code-block">
+          <pre>ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation ON documents
+  USING      (tenant_id = current_setting('app.tenant_id')::bigint)
+  WITH CHECK (tenant_id = current_setting('app.tenant_id')::bigint);
+
+-- Из приложения перед запросами арендатора:
+SET app.tenant_id = '42';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-rls">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Владелец таблицы и суперпользователь обходят RLS. Чтобы они тоже подчинялись политикам — <code>ALTER TABLE … FORCE ROW LEVEL SECURITY</code>.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-security-definer">
+        <h3>Безопасные SECURITY DEFINER-функции</h3>
+        <p class="summary">Функция выполняется с правами своего владельца.</p>
+        <div class="code-block">
+          <pre>CREATE OR REPLACE FUNCTION audit_log(msg text)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  INSERT INTO audit (msg, who, ts) VALUES (msg, current_user, now());
+$$;
+
+REVOKE ALL ON FUNCTION audit_log(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION audit_log(text) TO app_user;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-security-definer">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Без <code>SET search_path</code> вызывающий может подменить функцию из своей схемы — это классический вектор повышения привилегий.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-prepared-statements">
+        <h3>Prepared statements и SQL-инъекции</h3>
+        <p class="summary">Параметризация — и защита, и кэш плана.</p>
+        <div class="code-block">
+          <pre>PREPARE p (bigint) AS
+  SELECT id, total FROM orders WHERE user_id = $1;
+
+EXECUTE p (42);
+DEALLOCATE p;
+
+-- В приложении используй placeholders драйвера ($1, ?), никогда не клей строки SQL.</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-prepared-statements">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>После 5+ выполнений Postgres может перейти на <em>generic plan</em>. Иногда это хуже custom-плана с конкретными значениями — проверяй на тяжёлых запросах.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ===== Поиск ===== -->
+    <section class="category">
+      <h2>5. Поиск по тексту</h2>
+      <p class="sub">FTS и нечёткий поиск.</p>
+
+      <article class="topic" id="sr-fulltext">
+        <h3>Полнотекстовый поиск</h3>
+        <p class="summary"><code>tsvector</code>, <code>tsquery</code>, GIN-индекс.</p>
+        <div class="code-block">
+          <pre>ALTER TABLE articles ADD COLUMN tsv tsvector
+  GENERATED ALWAYS AS (
+    to_tsvector('russian', coalesce(title,'') || ' ' || coalesce(body,''))
+  ) STORED;
+
+CREATE INDEX idx_articles_tsv ON articles USING gin (tsv);
+
+SELECT id, ts_rank(tsv, q) AS rank
+FROM   articles, plainto_tsquery('russian', $1) q
+WHERE  tsv @@ q
+ORDER  BY rank DESC
+LIMIT  20;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-fulltext">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-pg-trgm">
+        <h3>pg_trgm — нечёткий и подстрочный поиск</h3>
+        <p class="summary">Ускоряет <code>LIKE '%foo%'</code> и даёт <code>similarity()</code>.</p>
+        <div class="code-block">
+          <pre>CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX idx_users_email_trgm
+  ON users USING gin (email gin_trgm_ops);
+
+SELECT * FROM users WHERE email ILIKE '%example%';
+
+SELECT *, similarity(name, $1) AS s
+FROM   users
+ORDER  BY s DESC
+LIMIT  10;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pg-trgm">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ===== Postgres из приложения ===== -->
+    <section class="category">
+      <h2>6. Postgres из веб-приложения</h2>
+      <p class="sub">ORM, наблюдаемость, типичные ловушки.</p>
+
+      <article class="topic" id="sr-app-orm">
+        <h3>ORM vs raw SQL</h3>
+        <p class="summary">Когда ORM помогает, а когда мешает.</p>
+        <div class="code-block">
+          <pre>-- N+1 в ORM:
+-- users.forEach(u =&gt; orm.orders.find({ where: { userId: u.id } }))
+--   → 1 + N запросов
+
+-- решение 1: eager-load / include
+-- решение 2: один JOIN/CTE на стороне БД
+
+WITH u AS (
+  SELECT id, email FROM users WHERE is_active
+)
+SELECT u.email, json_agg(o.* ORDER BY o.created_at DESC) FILTER (WHERE o.id IS NOT NULL) AS orders
+FROM   u
+LEFT JOIN orders o ON o.user_id = u.id
+GROUP  BY u.email;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-app-orm">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Включай в драйвере логирование SQL хотя бы в dev-окружении — иначе ORM незаметно превращает один экран в сотни запросов.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-observability">
+        <h3>Наблюдаемость: метрики и slow log</h3>
+        <p class="summary"><code>pg_stat_database</code>, медленные запросы, ожидания блокировок.</p>
+        <div class="code-block">
+          <pre>SELECT datname, numbackends, xact_commit, xact_rollback,
+       blks_read, blks_hit,
+       round(100.0 * blks_hit / NULLIF(blks_hit + blks_read, 0), 2) AS cache_hit_pct,
+       deadlocks
+FROM   pg_stat_database
+WHERE  datname IS NOT NULL
+ORDER  BY datname;
+
+ALTER SYSTEM SET log_min_duration_statement = '500ms';
+ALTER SYSTEM SET log_lock_waits = on;
+SELECT pg_reload_conf();</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-observability">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Хороший минимум алертов: cache hit ratio &lt; 99%, рост deadlocks, лаг репликации, <code>idle in transaction</code> &gt; нескольких минут, медленные запросы из <code>pg_stat_statements</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <p style="color: var(--text-muted); margin-top: 40px; font-size: 13px;">
+      Это второй слой знаний — поверх базовой шпаргалки. ИИ-ментор по каждой теме разберёт сценарий и поможет проверить понимание сократическим методом.
+    </p>
+  </main>
+</div>
+</body>
+</html>

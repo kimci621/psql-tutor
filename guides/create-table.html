@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Гайд: создание таблицы в PostgreSQL</title>
+<link rel="stylesheet" href="../assets/styles.css">
+<script type="module" src="../assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="../index.html">Шпаргалка</a></li>
+      <li><a href="../errors.html">Частые ошибки</a></li>
+      <li><a href="../senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="list-tables.html">Список таблиц</a></li>
+      <li><a href="create-table.html">Создание таблицы</a></li>
+      <li><a href="vacuum.html">VACUUM</a></li>
+      <li><a href="list-users.html">Список пользователей</a></li>
+      <li><a href="create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><a href="../index.html">Главная</a> · Гайд · Создание таблицы</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Как создать таблицу осознанно</h1>
+    <p class="page-lead">
+      Команда <code>CREATE TABLE</code> кажется простой, но именно здесь закладывается долговечность модели данных.
+      Правильно выбранные типы, ограничения и стратегия первичного ключа избавят тебя от головной боли при росте таблицы.
+    </p>
+
+    <article class="topic" id="g-ct-basic">
+      <h3>Минимальный современный шаблон</h3>
+      <p class="summary">Identity-ключ, явные NOT NULL и DEFAULT, <code>timestamptz</code>.</p>
+      <div class="code-block">
+        <pre>CREATE TABLE products (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  sku         text   NOT NULL UNIQUE,
+  name        text   NOT NULL,
+  price_cents integer NOT NULL CHECK (price_cents &gt;= 0),
+  is_active   boolean NOT NULL DEFAULT true,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-table">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ct-identity">
+      <h3>Identity vs serial</h3>
+      <p class="summary">Современный способ автоинкремента — стандарт SQL.</p>
+      <div class="code-block">
+        <pre>-- предпочтительно с PG 10:
+id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+
+-- старый способ (всё ещё работает):
+id bigserial PRIMARY KEY</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-table">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p><code>GENERATED ALWAYS</code> запрещает вставлять явный id извне (нужен <code>OVERRIDING SYSTEM VALUE</code>). Это полезно: убирает класс багов «случайно вставили чужой id».</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ct-fk">
+      <h3>Внешние ключи</h3>
+      <p class="summary">FK с явным правилом каскада и индексом для быстрых соединений.</p>
+      <div class="code-block">
+        <pre>CREATE TABLE order_items (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  order_id   bigint NOT NULL REFERENCES orders(id)   ON DELETE CASCADE,
+  product_id bigint NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  qty        integer NOT NULL CHECK (qty &gt; 0)
+);
+
+CREATE INDEX idx_order_items_order   ON order_items (order_id);
+CREATE INDEX idx_order_items_product ON order_items (product_id);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-table">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p>Postgres сам не строит индекс под FK-столбцом. Без индекса <code>JOIN</code> и каскадные удаления могут быть очень медленными.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ct-generated">
+      <h3>Generated-столбцы</h3>
+      <p class="summary">Хранимое выражение, которое всегда совпадает с правилом.</p>
+      <div class="code-block">
+        <pre>CREATE TABLE products (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  sku         text NOT NULL UNIQUE,
+  search_text text GENERATED ALWAYS AS (lower(sku)) STORED
+);
+
+CREATE INDEX idx_products_search ON products (search_text);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-table">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p>Удобно для предвычисленного значения, по которому строится индекс — например, <code>lower()</code> для регистронезависимого поиска.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ct-pitfalls">
+      <h3>Что часто ломается</h3>
+      <div class="desc">
+        <ul>
+          <li><code>varchar(n)</code> не даёт выигрыша по производительности; чаще достаточно <code>text</code>.</li>
+          <li><code>timestamp without time zone</code> ведёт себя неожиданно при смене таймзоны клиента — для прикладных задач предпочитай <code>timestamptz</code>.</li>
+          <li>Ограничения с <code>NOT VALID</code> позволяют добавить FK/CHECK без проверки старых данных, а позже выполнить <code>VALIDATE CONSTRAINT</code>.</li>
+          <li>Если таблица будет очень большой, продумай <code>PARTITION BY</code> заранее — позже секционировать сложнее.</li>
+        </ul>
+      </div>
+    </article>
+  </main>
+</div>
+</body>
+</html>

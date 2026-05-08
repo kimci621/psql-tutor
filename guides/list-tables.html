@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Гайд: список таблиц в PostgreSQL</title>
+<link rel="stylesheet" href="../assets/styles.css">
+<script type="module" src="../assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="../index.html">Шпаргалка</a></li>
+      <li><a href="../errors.html">Частые ошибки</a></li>
+      <li><a href="../senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="list-tables.html">Список таблиц</a></li>
+      <li><a href="create-table.html">Создание таблицы</a></li>
+      <li><a href="vacuum.html">VACUUM</a></li>
+      <li><a href="list-users.html">Список пользователей</a></li>
+      <li><a href="create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><a href="../index.html">Главная</a> · Гайд · Список таблиц</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Как получить список таблиц</h1>
+    <p class="page-lead">
+      В PostgreSQL есть три рабочих способа узнать, какие таблицы существуют:
+      метакоманды <code>psql</code>, представления <code>information_schema</code> и системный каталог <code>pg_catalog</code>.
+      Каждый из них показывает чуть разный срез: то, что доступно <em>тебе</em>, то, что находится в нужной схеме, то, что вообще существует на сервере.
+    </p>
+
+    <article class="topic" id="g-lt-psql">
+      <h3>1. Самый быстрый способ — <code>psql</code></h3>
+      <p class="summary">Метакоманды на бэкслеше — это сахар над запросами к каталогу. Удобно в интерактиве.</p>
+      <div class="code-block">
+        <pre>\dt              -- таблицы текущей схемы (по search_path)
+\dt+             -- + размер и описание
+\dt public.*     -- все таблицы в схеме public
+\dt *.*          -- все таблицы во всех схемах
+\d  users        -- описание таблицы users (столбцы, индексы, ограничения)</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-list-tables">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-lt-isch">
+      <h3>2. Через <code>information_schema</code></h3>
+      <p class="summary">Стандарт SQL — переносится между СУБД. Показывает только то, к чему у тебя есть права.</p>
+      <div class="code-block">
+        <pre>SELECT table_schema, table_name
+FROM   information_schema.tables
+WHERE  table_type = 'BASE TABLE'
+  AND  table_schema NOT IN ('pg_catalog','information_schema')
+ORDER  BY table_schema, table_name;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-list-tables">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-lt-pgcat">
+      <h3>3. Через <code>pg_catalog.pg_tables</code></h3>
+      <p class="summary">Postgres-специфично, но компактно и удобно для скриптов.</p>
+      <div class="code-block">
+        <pre>SELECT schemaname, tablename, tableowner
+FROM   pg_catalog.pg_tables
+WHERE  schemaname NOT IN ('pg_catalog','information_schema')
+ORDER  BY schemaname, tablename;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-list-tables">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-lt-sizes">
+      <h3>Размер каждой таблицы</h3>
+      <p class="summary">Полный размер вместе с TOAST и индексами.</p>
+      <div class="code-block">
+        <pre>SELECT n.nspname                                             AS schema,
+       c.relname                                             AS table,
+       pg_size_pretty(pg_total_relation_size(c.oid))         AS total,
+       pg_size_pretty(pg_relation_size(c.oid))               AS heap,
+       pg_size_pretty(pg_indexes_size(c.oid))                AS indexes
+FROM   pg_class c
+JOIN   pg_namespace n ON n.oid = c.relnamespace
+WHERE  c.relkind = 'r'
+  AND  n.nspname NOT IN ('pg_catalog','information_schema')
+ORDER  BY pg_total_relation_size(c.oid) DESC
+LIMIT  20;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-list-tables">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p><code>pg_total_relation_size</code> учитывает индексы и TOAST. <code>pg_relation_size</code> — только основной heap.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-lt-pitfalls">
+      <h3>Подводные камни</h3>
+      <div class="desc">
+        <ul>
+          <li><strong>information_schema</strong> скроет таблицы, к которым у текущей роли нет ни одного права. <code>pg_catalog.pg_tables</code> покажет их в любом случае.</li>
+          <li><strong>pg_tables</strong> содержит только обычные таблицы. Чтобы увидеть представления, материализованные представления и партиционированные таблицы, фильтруй <code>pg_class.relkind</code> по нужным значениям (<code>r, v, m, p</code>).</li>
+          <li><strong>search_path</strong> влияет только на «короткие» имена. Полное имя <code>schema.table</code> работает всегда.</li>
+        </ul>
+      </div>
+    </article>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PostgreSQL Шпаргалка — локальный учебник с ИИ-ментором</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Шпаргалка</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Шпаргалка по PostgreSQL</h1>
+    <p class="page-lead">
+      Краткая выжимка команд и приёмов с примерами и пояснениями на русском. У каждой темы есть кнопка
+      «Поучиться с ИИ» — она открывает диалог с локальным наставником (LM Studio), который ведёт сократический
+      разговор: задаёт вопросы, проверяет понимание и не выдаёт готовые ответы сразу.
+    </p>
+
+    <!-- ========== 1. Подключение и сессия ========== -->
+    <section class="category">
+      <h2>1. Подключение и сессия</h2>
+      <p class="sub">Запуск psql, выбор БД, информация о текущем окружении.</p>
+
+      <article class="topic" id="psql-connect">
+        <h3>Подключение через psql</h3>
+        <p class="summary">Утилита <code>psql</code> подключается к серверу с указанием хоста, порта, пользователя и БД.</p>
+        <div class="code-block">
+          <pre>psql -h localhost -p 5432 -U postgres -d mydb
+\c another_db</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="psql-connect">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Параметры: <code>-h</code> хост, <code>-p</code> порт, <code>-U</code> пользователь, <code>-d</code> имя БД. Команда <code>\c</code> внутри psql переключает БД без перезапуска утилиты.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="session-info">
+        <h3>Информация о сессии</h3>
+        <p class="summary">Версия сервера, текущий пользователь и БД, активный <code>search_path</code>.</p>
+        <div class="code-block">
+          <pre>SELECT version();
+SELECT current_user, current_database();
+SHOW search_path;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="session-info">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>search_path</code> определяет порядок схем, в которых ищутся неквалифицированные имена объектов. <code>current_user</code> и <code>session_user</code> могут отличаться после <code>SET ROLE</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 2. Базы данных ========== -->
+    <section class="category">
+      <h2>2. Базы данных</h2>
+      <p class="sub">Создание, удаление, просмотр и измерение размеров.</p>
+
+      <article class="topic" id="create-database">
+        <h3>Создание базы</h3>
+        <p class="summary">Создавай БД с явной кодировкой, владельцем и шаблоном.</p>
+        <div class="code-block">
+          <pre>CREATE DATABASE shop
+  OWNER     app_user
+  ENCODING  'UTF8'
+  TEMPLATE  template0;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="create-database">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>template0</code> — «чистый» шаблон без локаль-зависимых объектов; удобен, когда задаёшь нестандартную кодировку.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="drop-database">
+        <h3>Удаление базы</h3>
+        <p class="summary">Сначала освободи БД от подключений, затем удаляй.</p>
+        <div class="code-block">
+          <pre>SELECT pg_terminate_backend(pid)
+FROM   pg_stat_activity
+WHERE  datname = 'shop'
+  AND  pid &lt;&gt; pg_backend_pid();
+
+DROP DATABASE IF EXISTS shop;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="drop-database">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>В PostgreSQL 13+ работает <code>DROP DATABASE shop WITH (FORCE);</code> — он сам отключит клиентов.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="list-databases">
+        <h3>Список баз и их размер</h3>
+        <p class="summary">Через psql и через системный каталог.</p>
+        <div class="code-block">
+          <pre>\l
+
+SELECT datname,
+       pg_size_pretty(pg_database_size(datname)) AS size
+FROM   pg_database
+ORDER  BY pg_database_size(datname) DESC;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="list-databases">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 3. Схемы ========== -->
+    <section class="category">
+      <h2>3. Схемы</h2>
+      <p class="sub">Пространства имён внутри одной БД.</p>
+
+      <article class="topic" id="create-schema">
+        <h3>Создание схемы</h3>
+        <p class="summary">Группируй объекты по логическим зонам и управляй <code>search_path</code>.</p>
+        <div class="code-block">
+          <pre>CREATE SCHEMA IF NOT EXISTS reporting AUTHORIZATION analyst;
+SET search_path = reporting, public;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="create-schema">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="list-schemas">
+        <h3>Список схем</h3>
+        <p class="summary">Метакоманда psql и запрос к <code>information_schema</code>.</p>
+        <div class="code-block">
+          <pre>\dn
+
+SELECT schema_name
+FROM   information_schema.schemata
+ORDER  BY schema_name;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="list-schemas">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 4. Таблицы ========== -->
+    <section class="category">
+      <h2>4. Таблицы (DDL)</h2>
+      <p class="sub">Создание, изменение и удаление таблиц.</p>
+
+      <article class="topic" id="create-table-basic">
+        <h3>CREATE TABLE — базовый синтаксис</h3>
+        <p class="summary">Опиши столбцы, типы, ограничения и значения по умолчанию.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE users (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email      text UNIQUE NOT NULL,
+  is_active  boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="create-table-basic">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>С PG 10+ предпочитай <code>GENERATED ALWAYS AS IDENTITY</code> вместо <code>bigserial</code>: явный стандарт SQL и аккуратные права.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="alter-table">
+        <h3>ALTER TABLE</h3>
+        <p class="summary">Добавление, удаление и переименование столбцов и ограничений.</p>
+        <div class="code-block">
+          <pre>ALTER TABLE users ADD    COLUMN last_login timestamptz;
+ALTER TABLE users DROP   COLUMN last_login;
+ALTER TABLE users RENAME COLUMN email TO email_address;
+ALTER TABLE users ALTER  COLUMN is_active SET DEFAULT false;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="alter-table">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="drop-truncate">
+        <h3>DROP и TRUNCATE</h3>
+        <p class="summary">Удаление таблицы целиком и быстрая очистка содержимого.</p>
+        <div class="code-block">
+          <pre>DROP TABLE IF EXISTS old_users CASCADE;
+
+TRUNCATE users RESTART IDENTITY CASCADE;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="drop-truncate">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>TRUNCATE</code> минует триггеры <code>ON DELETE</code> и обычно гораздо быстрее, чем массовый <code>DELETE</code>, но забирает <em>ACCESS EXCLUSIVE</em>.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 5. Типы ========== -->
+    <section class="category">
+      <h2>5. Типы данных</h2>
+      <p class="sub">Базовый набор и типичные ловушки.</p>
+
+      <article class="topic" id="data-types">
+        <h3>Числа, строки, время, jsonb, массивы</h3>
+        <p class="summary">Большая часть прикладных задач закрывается этими типами.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE t (
+  i   integer,
+  bi  bigint,
+  n   numeric(12,2),
+  s   text,
+  v   varchar(255),
+  ts  timestamptz,
+  u   uuid,
+  j   jsonb,
+  arr int[]
+);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="data-types">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>numeric</code> — точная арифметика; <code>real/double precision</code> — приблизительная. Длина в <code>varchar(n)</code> не даёт выигрыша по хранению.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 6. Ограничения ========== -->
+    <section class="category">
+      <h2>6. Ограничения целостности</h2>
+      <p class="sub">PRIMARY KEY, UNIQUE, FOREIGN KEY, CHECK и DEFAULT.</p>
+
+      <article class="topic" id="constraints">
+        <h3>Сводный пример</h3>
+        <p class="summary">Все базовые ограничения в одной таблице.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE orders (
+  id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  total      numeric(12,2) NOT NULL CHECK (total &gt;= 0),
+  status     text NOT NULL DEFAULT 'new',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, created_at)
+);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="constraints">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 7. CRUD ========== -->
+    <section class="category">
+      <h2>7. CRUD</h2>
+      <p class="sub">INSERT / UPDATE / DELETE и UPSERT.</p>
+
+      <article class="topic" id="insert-basics">
+        <h3>INSERT и RETURNING</h3>
+        <p class="summary">Одиночные и пакетные вставки, возврат сгенерированных значений.</p>
+        <div class="code-block">
+          <pre>INSERT INTO users (email)
+VALUES  ('a@example.com'), ('b@example.com')
+RETURNING id, email;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="insert-basics">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="upsert">
+        <h3>UPSERT через ON CONFLICT</h3>
+        <p class="summary">Атомарная вставка-или-обновление по UNIQUE.</p>
+        <div class="code-block">
+          <pre>INSERT INTO counters (key, n)
+VALUES  ('hits', 1)
+ON CONFLICT (key) DO UPDATE
+  SET n = counters.n + EXCLUDED.n
+RETURNING n;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="upsert">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="update-delete">
+        <h3>UPDATE и DELETE с условиями из других таблиц</h3>
+        <p class="summary"><code>FROM</code> в <code>UPDATE</code> и <code>USING</code> в <code>DELETE</code>.</p>
+        <div class="code-block">
+          <pre>UPDATE orders o
+SET    status = 'paid'
+FROM   payments p
+WHERE  p.order_id = o.id
+  AND  p.success;
+
+DELETE FROM sessions
+WHERE  expires_at &lt; now()
+RETURNING id;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="update-delete">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 8. Выборка ========== -->
+    <section class="category">
+      <h2>8. Выборка (SELECT)</h2>
+      <p class="sub">Базовые операторы и пагинация.</p>
+
+      <article class="topic" id="select-basics">
+        <h3>SELECT с WHERE, ORDER BY, LIMIT</h3>
+        <p class="summary">Минимальный набор для повседневных запросов.</p>
+        <div class="code-block">
+          <pre>SELECT id, email
+FROM   users
+WHERE  is_active
+ORDER  BY created_at DESC
+LIMIT  10;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="select-basics">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="filtering">
+        <h3>Фильтрация: IN, BETWEEN, LIKE, IS NULL</h3>
+        <p class="summary">Главная ловушка — поведение NULL в сравнениях.</p>
+        <div class="code-block">
+          <pre>SELECT * FROM products WHERE price BETWEEN 100 AND 500;
+SELECT * FROM orders   WHERE status IN ('new','paid');
+SELECT * FROM users    WHERE email LIKE '%@example.com';
+SELECT * FROM users    WHERE deleted_at IS NULL;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="filtering">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="limit-offset">
+        <h3>Пагинация: OFFSET и keyset</h3>
+        <p class="summary">OFFSET читаемый, но дорогой; keyset — быстрый.</p>
+        <div class="code-block">
+          <pre>-- классическая, удобная, но медленная на больших таблицах:
+SELECT * FROM posts ORDER BY created_at DESC LIMIT 20 OFFSET 100;
+
+-- keyset-пагинация:
+SELECT * FROM posts
+WHERE  created_at &lt; $1
+ORDER  BY created_at DESC
+LIMIT  20;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="limit-offset">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 9. JOIN ========== -->
+    <section class="category">
+      <h2>9. Соединения</h2>
+      <p class="sub">INNER, LEFT, FULL, CROSS и LATERAL.</p>
+
+      <article class="topic" id="joins">
+        <h3>Базовые JOIN</h3>
+        <p class="summary">Разные типы соединений с одинаковыми таблицами.</p>
+        <div class="code-block">
+          <pre>SELECT u.email, o.id
+FROM   users u
+JOIN   orders o ON o.user_id = u.id;
+
+SELECT u.email, o.id
+FROM   users u
+LEFT JOIN orders o ON o.user_id = u.id;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="joins">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Условие на «правую» таблицу в <code>WHERE</code> после <code>LEFT JOIN</code> неявно превращает его в <code>INNER</code>. Если хочешь сохранить семантику — фильтруй внутри <code>ON</code>.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="lateral-join">
+        <h3>LATERAL JOIN: «top-N на пользователя»</h3>
+        <p class="summary">Подзапрос видит столбцы предыдущих таблиц.</p>
+        <div class="code-block">
+          <pre>SELECT u.id, latest.created_at
+FROM   users u
+LEFT JOIN LATERAL (
+  SELECT created_at FROM orders o
+  WHERE  o.user_id = u.id
+  ORDER  BY created_at DESC
+  LIMIT  1
+) latest ON true;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="lateral-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 10. Агрегации ========== -->
+    <section class="category">
+      <h2>10. Агрегации</h2>
+      <p class="sub">GROUP BY, HAVING, FILTER.</p>
+
+      <article class="topic" id="group-by">
+        <h3>GROUP BY с FILTER</h3>
+        <p class="summary">Условные агрегаты без CASE WHEN.</p>
+        <div class="code-block">
+          <pre>SELECT user_id,
+       count(*) FILTER (WHERE status = 'paid') AS paid_count,
+       count(*)                                AS all_count,
+       sum(total)                              AS revenue
+FROM   orders
+GROUP  BY user_id
+HAVING count(*) &gt; 5
+ORDER  BY revenue DESC;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="group-by">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 11. CTE ========== -->
+    <section class="category">
+      <h2>11. CTE и подзапросы</h2>
+      <p class="sub">WITH и рекурсия.</p>
+
+      <article class="topic" id="cte">
+        <h3>WITH — именованные подзапросы</h3>
+        <p class="summary">Делает запрос читаемым, можно ссылаться несколько раз.</p>
+        <div class="code-block">
+          <pre>WITH active AS (
+  SELECT id, email FROM users WHERE is_active
+)
+SELECT a.email, count(o.id)
+FROM   active a
+LEFT JOIN orders o ON o.user_id = a.id
+GROUP  BY a.email;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cte">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="recursive-cte">
+        <h3>WITH RECURSIVE — обход иерархий</h3>
+        <p class="summary">Деревья категорий, графы зависимостей.</p>
+        <div class="code-block">
+          <pre>WITH RECURSIVE tree AS (
+  SELECT id, parent_id, 1 AS depth FROM categories WHERE parent_id IS NULL
+  UNION ALL
+  SELECT c.id, c.parent_id, t.depth + 1
+  FROM   categories c
+  JOIN   tree t ON c.parent_id = t.id
+)
+SELECT * FROM tree;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="recursive-cte">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 12. Window ========== -->
+    <section class="category">
+      <h2>12. Оконные функции</h2>
+      <p class="sub">Аналитика без потери исходных строк.</p>
+
+      <article class="topic" id="windows">
+        <h3>ROW_NUMBER, LAG, PARTITION BY</h3>
+        <p class="summary">«N последних на пользователя» и разности по соседним строкам.</p>
+        <div class="code-block">
+          <pre>SELECT user_id, id, created_at,
+       row_number() OVER (PARTITION BY user_id ORDER BY created_at DESC) AS rn
+FROM   orders;
+
+SELECT id, total,
+       total - lag(total) OVER (ORDER BY id) AS diff
+FROM   orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="windows">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 13. Индексы ========== -->
+    <section class="category">
+      <h2>13. Индексы</h2>
+      <p class="sub">B-tree, частичные, по выражению, GIN.</p>
+
+      <article class="topic" id="create-index-btree">
+        <h3>CREATE INDEX (B-tree)</h3>
+        <p class="summary">Базовый индекс по столбцу или выражению.</p>
+        <div class="code-block">
+          <pre>CREATE INDEX CONCURRENTLY idx_orders_user_created
+  ON orders (user_id, created_at DESC);
+
+CREATE INDEX idx_users_email_lower
+  ON users (lower(email));</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="create-index-btree">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="partial-index">
+        <h3>Частичный индекс</h3>
+        <p class="summary">Покрывает только часть строк по предикату.</p>
+        <div class="code-block">
+          <pre>CREATE INDEX idx_orders_active
+  ON orders (user_id)
+  WHERE status &lt;&gt; 'cancelled';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="partial-index">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="gin-index">
+        <h3>GIN для jsonb и массивов</h3>
+        <p class="summary">Индексы по составным значениям.</p>
+        <div class="code-block">
+          <pre>CREATE INDEX idx_docs_data ON docs USING gin (data);
+CREATE INDEX idx_docs_tags ON docs USING gin (tags);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="gin-index">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 14. Транзакции ========== -->
+    <section class="category">
+      <h2>14. Транзакции и блокировки</h2>
+      <p class="sub">Уровни изоляции и FOR UPDATE.</p>
+
+      <article class="topic" id="transactions">
+        <h3>BEGIN/COMMIT и уровни изоляции</h3>
+        <p class="summary">По умолчанию READ COMMITTED; SERIALIZABLE требует retry.</p>
+        <div class="code-block">
+          <pre>BEGIN ISOLATION LEVEL SERIALIZABLE;
+  UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+  UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="transactions">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="locks">
+        <h3>FOR UPDATE SKIP LOCKED — очередь задач</h3>
+        <p class="summary">Шаблон для неблокирующей обработки заданий.</p>
+        <div class="code-block">
+          <pre>BEGIN;
+  SELECT * FROM jobs
+  WHERE  status = 'pending'
+  ORDER  BY id
+  LIMIT  1
+  FOR UPDATE SKIP LOCKED;
+
+  UPDATE jobs SET status = 'done' WHERE id = $1;
+COMMIT;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="locks">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 15. View ========== -->
+    <section class="category">
+      <h2>15. Представления</h2>
+      <p class="sub">VIEW и MATERIALIZED VIEW.</p>
+
+      <article class="topic" id="view">
+        <h3>VIEW — виртуальная таблица</h3>
+        <p class="summary">Сохранённый запрос, выполняется при каждом обращении.</p>
+        <div class="code-block">
+          <pre>CREATE OR REPLACE VIEW active_users AS
+SELECT id, email FROM users WHERE is_active;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="view">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="materialized-view">
+        <h3>MATERIALIZED VIEW и REFRESH</h3>
+        <p class="summary">Кэш результатов запроса с явным обновлением.</p>
+        <div class="code-block">
+          <pre>CREATE MATERIALIZED VIEW daily_stats AS
+SELECT date_trunc('day', created_at) AS d, count(*)
+FROM   orders
+GROUP  BY 1;
+
+REFRESH MATERIALIZED VIEW CONCURRENTLY daily_stats;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="materialized-view">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 16. Роли ========== -->
+    <section class="category">
+      <h2>16. Роли и права</h2>
+      <p class="sub">CREATE ROLE и GRANT.</p>
+
+      <article class="topic" id="create-role">
+        <h3>CREATE ROLE</h3>
+        <p class="summary">Сервисная роль и роль-«группа».</p>
+        <div class="code-block">
+          <pre>CREATE ROLE app_user LOGIN PASSWORD 'secret';
+CREATE ROLE readonly NOLOGIN;
+GRANT  readonly TO app_user;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="create-role">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="grants">
+        <h3>GRANT, REVOKE и DEFAULT PRIVILEGES</h3>
+        <p class="summary">Права на схемы и таблицы, в том числе на будущие.</p>
+        <div class="code-block">
+          <pre>GRANT USAGE  ON SCHEMA public TO readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT ON TABLES TO readonly;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="grants">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 17. Обслуживание ========== -->
+    <section class="category">
+      <h2>17. Обслуживание</h2>
+      <p class="sub">VACUUM, ANALYZE, REINDEX.</p>
+
+      <article class="topic" id="vacuum-basic">
+        <h3>VACUUM</h3>
+        <p class="summary">Уборка мёртвых версий строк и обновление статистики.</p>
+        <div class="code-block">
+          <pre>VACUUM (VERBOSE, ANALYZE) orders;
+-- Жёсткая уборка с переписыванием таблицы (блокировка ACCESS EXCLUSIVE):
+VACUUM FULL orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="vacuum-basic">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="analyze">
+        <h3>ANALYZE — статистика для планировщика</h3>
+        <p class="summary">Свежая статистика — хороший план запроса.</p>
+        <div class="code-block">
+          <pre>ANALYZE users;
+ANALYZE VERBOSE;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="analyze">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="reindex">
+        <h3>REINDEX CONCURRENTLY</h3>
+        <p class="summary">Перестройка раздутого индекса без даунтайма.</p>
+        <div class="code-block">
+          <pre>REINDEX INDEX CONCURRENTLY idx_orders_user_created;
+REINDEX TABLE CONCURRENTLY orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="reindex">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 18. EXPLAIN ========== -->
+    <section class="category">
+      <h2>18. EXPLAIN</h2>
+      <p class="sub">План запроса и фактические тайминги.</p>
+
+      <article class="topic" id="explain">
+        <h3>EXPLAIN (ANALYZE, BUFFERS)</h3>
+        <p class="summary">Сравни предсказание и факт; смотри узкие места.</p>
+        <div class="code-block">
+          <pre>EXPLAIN SELECT * FROM orders WHERE user_id = 1;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE user_id = 1;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="explain">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>EXPLAIN ANALYZE</code> реально выполняет запрос. Для UPDATE/DELETE оборачивай в транзакцию с откатом.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 19. JSONB ========== -->
+    <section class="category">
+      <h2>19. JSON / JSONB</h2>
+      <p class="sub">Гибкие данные и индексы по ним.</p>
+
+      <article class="topic" id="jsonb">
+        <h3>Доступ и поиск в jsonb</h3>
+        <p class="summary"><code>-&gt;</code>, <code>-&gt;&gt;</code>, <code>@&gt;</code> и GIN-индекс.</p>
+        <div class="code-block">
+          <pre>SELECT data-&gt;&gt;'name' AS name FROM docs;
+SELECT *            FROM docs WHERE data @&gt; '{"role":"admin"}';
+SELECT jsonb_array_elements(data-&gt;'tags') FROM docs;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="jsonb">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== 20. Дата/время ========== -->
+    <section class="category">
+      <h2>20. Дата и время</h2>
+      <p class="sub">now(), interval, date_trunc, часовые пояса.</p>
+
+      <article class="topic" id="datetime">
+        <h3>Группировка по дням и сдвиг таймзоны</h3>
+        <p class="summary"><code>date_trunc</code> и <code>AT TIME ZONE</code>.</p>
+        <div class="code-block">
+          <pre>SELECT now(), now() - interval '7 days';
+
+SELECT date_trunc('day', created_at) AS d, count(*)
+FROM   orders
+GROUP  BY 1;
+
+SELECT now() AT TIME ZONE 'Europe/Moscow';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="datetime">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <p style="color: var(--text-muted); margin-top: 40px; font-size: 13px;">
+      Локальный учебник для офлайн-обучения. Содержимое оригинальное; SQL-примеры основаны на синтаксисе PostgreSQL (PostgreSQL License).
+    </p>
+  </main>
+</div>
+</body>
+</html>

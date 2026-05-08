@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Гайд: создание индекса в PostgreSQL</title>
+<link rel="stylesheet" href="../assets/styles.css">
+<script type="module" src="../assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="../index.html">Шпаргалка</a></li>
+      <li><a href="../errors.html">Частые ошибки</a></li>
+      <li><a href="../senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="list-tables.html">Список таблиц</a></li>
+      <li><a href="create-table.html">Создание таблицы</a></li>
+      <li><a href="vacuum.html">VACUUM</a></li>
+      <li><a href="list-users.html">Список пользователей</a></li>
+      <li><a href="create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><a href="../index.html">Главная</a> · Гайд · Индексы</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Как и когда создавать индекс</h1>
+    <p class="page-lead">
+      Индекс — это вспомогательная структура, ускоряющая поиск, но замедляющая запись и занимающая место.
+      Хорошее правило: сначала найди медленный запрос, посмотри его план через <code>EXPLAIN</code>, и только потом
+      думай про индекс. «Накидать индексы про запас» обычно вредно.
+    </p>
+
+    <article class="topic" id="g-ci-btree">
+      <h3>Базовый B-tree</h3>
+      <p class="summary">Самый частый индекс: равенство, неравенство, диапазоны, сортировка.</p>
+      <div class="code-block">
+        <pre>CREATE INDEX idx_orders_user_created
+  ON orders (user_id, created_at DESC);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-index">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p>Порядок столбцов важен. Индекс <code>(user_id, created_at)</code> отлично работает для запросов с <code>WHERE user_id = ?</code> и опциональным условием по <code>created_at</code>, но плохо — для запросов только по <code>created_at</code>.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ci-concurrent">
+      <h3>CREATE INDEX CONCURRENTLY</h3>
+      <p class="summary">Безопасный способ создавать индекс на работающей системе.</p>
+      <div class="code-block">
+        <pre>CREATE INDEX CONCURRENTLY idx_orders_status
+  ON orders (status);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-index">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <ul>
+          <li>не блокирует <code>INSERT/UPDATE/DELETE</code>;</li>
+          <li>не выполняется внутри транзакции;</li>
+          <li>если упал — оставит индекс в состоянии <code>INVALID</code>; его нужно удалить и попробовать снова: <code>DROP INDEX CONCURRENTLY idx_orders_status;</code></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ci-expression">
+      <h3>Индекс по выражению</h3>
+      <p class="summary">Когда фильтруешь по результату функции — индексируй сам результат.</p>
+      <div class="code-block">
+        <pre>CREATE INDEX idx_users_email_lower
+  ON users (lower(email));
+
+-- работает с этим запросом:
+SELECT * FROM users WHERE lower(email) = lower($1);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-index">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p>Главное — точно те же выражения должны быть в <code>WHERE</code>, иначе планировщик индекс не подцепит.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ci-partial">
+      <h3>Частичный индекс</h3>
+      <p class="summary">Индексируем только подмножество строк, которое реально читают.</p>
+      <div class="code-block">
+        <pre>CREATE INDEX idx_orders_pending
+  ON orders (created_at)
+  WHERE status = 'pending';
+
+-- запрос, для которого он построен:
+SELECT * FROM orders
+WHERE  status = 'pending'
+ORDER  BY created_at
+LIMIT  100;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-index">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p>Полезен, когда «горячая» подмножество данных значительно меньше всей таблицы — экономит место и стоимость записи.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ci-other-types">
+      <h3>Другие типы индексов</h3>
+      <div class="code-block">
+        <pre>-- GIN: jsonb, массивы, полнотекстовый поиск
+CREATE INDEX idx_docs_data ON docs USING gin (data);
+
+-- BRIN: огромные таблицы с естественным порядком (например, по времени)
+CREATE INDEX idx_events_time_brin ON events USING brin (created_at);
+
+-- HASH: только равенство (после PG 10 — журналируется, можно использовать)
+CREATE INDEX idx_sessions_token_hash ON sessions USING hash (token);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-index">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ci-validate">
+      <h3>Проверка: используется ли индекс</h3>
+      <div class="code-block">
+        <pre>EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders
+WHERE  user_id = 1
+ORDER  BY created_at DESC
+LIMIT  20;
+
+SELECT indexrelname, idx_scan, idx_tup_read, idx_tup_fetch
+FROM   pg_stat_user_indexes
+WHERE  relname = 'orders'
+ORDER  BY idx_scan DESC;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-create-index">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p>Индексы с <code>idx_scan = 0</code> на проде — кандидаты на удаление: они занимают место и тормозят запись.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-ci-pitfalls">
+      <h3>Когда индекс не помогает</h3>
+      <div class="desc">
+        <ul>
+          <li>таблица слишком маленькая — Seq Scan дешевле;</li>
+          <li>селективность плохая — индекс возвращает половину строк, дешевле прочитать всё;</li>
+          <li>в запросе используется <code>LIKE '%x%'</code> — обычный B-tree бесполезен; нужен trigram-индекс (<code>pg_trgm</code>);</li>
+          <li>устарела статистика — спасает <code>ANALYZE</code>;</li>
+          <li>выражение в <code>WHERE</code> не совпадает с выражением в индексе.</li>
+        </ul>
+      </div>
+    </article>
+  </main>
+</div>
+</body>
+</html>

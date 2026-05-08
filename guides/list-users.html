@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Гайд: список пользователей в PostgreSQL</title>
+<link rel="stylesheet" href="../assets/styles.css">
+<script type="module" src="../assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="../index.html">Шпаргалка</a></li>
+      <li><a href="../errors.html">Частые ошибки</a></li>
+      <li><a href="../senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="list-tables.html">Список таблиц</a></li>
+      <li><a href="create-table.html">Создание таблицы</a></li>
+      <li><a href="vacuum.html">VACUUM</a></li>
+      <li><a href="list-users.html">Список пользователей</a></li>
+      <li><a href="create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><a href="../index.html">Главная</a> · Гайд · Пользователи</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Список пользователей и ролей</h1>
+    <p class="page-lead">
+      В PostgreSQL «пользователь» и «роль» — это одна и та же сущность. Роль с атрибутом <code>LOGIN</code>
+      может подключаться к серверу, без <code>LOGIN</code> — обычно играет роль группы. Поэтому
+      «список пользователей» можно прочитать тремя разными способами, и они показывают чуть разные данные.
+    </p>
+
+    <article class="topic" id="g-lu-psql">
+      <h3>1. Через psql</h3>
+      <p class="summary"><code>\du</code> показывает имя, атрибуты и членство в других ролях.</p>
+      <div class="code-block">
+        <pre>\du
+\du+      -- с описанием
+\du role  -- одну роль</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-list-users">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-lu-roles">
+      <h3>2. Через <code>pg_roles</code> (все роли)</h3>
+      <p class="summary">Системное представление с подробными атрибутами.</p>
+      <div class="code-block">
+        <pre>SELECT rolname,
+       rolsuper,
+       rolcanlogin,
+       rolcreatedb,
+       rolcreaterole,
+       rolreplication,
+       rolconnlimit,
+       rolvaliduntil
+FROM   pg_roles
+ORDER  BY rolname;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-list-users">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-lu-users">
+      <h3>3. Через <code>pg_user</code> (только LOGIN-роли)</h3>
+      <p class="summary">Представление-помощник: «настоящие пользователи».</p>
+      <div class="code-block">
+        <pre>SELECT usename, usesuper, usecreatedb
+FROM   pg_user
+ORDER  BY usename;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-list-users">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-lu-membership">
+      <h3>Кто в какой роли состоит</h3>
+      <p class="summary">Иерархия ролей через <code>pg_auth_members</code>.</p>
+      <div class="code-block">
+        <pre>SELECT r.rolname  AS role,
+       m.rolname  AS member,
+       am.admin_option
+FROM   pg_auth_members am
+JOIN   pg_roles r ON r.oid = am.roleid
+JOIN   pg_roles m ON m.oid = am.member
+ORDER  BY r.rolname, m.rolname;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-list-users">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="topic" id="g-lu-pitfalls">
+      <h3>На что обращать внимание</h3>
+      <div class="desc">
+        <ul>
+          <li><code>rolsuper = true</code> — суперпользователь, обходит ограничения. Таких ролей должно быть как можно меньше.</li>
+          <li><code>rolvaliduntil</code> — дата окончания пароля; стоит проверять для сервисных учёток.</li>
+          <li><code>pg_user</code> прячет роли без <code>LOGIN</code>. Если ищешь «всё» — используй <code>pg_roles</code>.</li>
+          <li>Старые роли с <code>rolcanlogin = false</code>, к которым никто давно не обращается, стоит периодически чистить через <code>DROP ROLE</code> (после <code>REASSIGN OWNED</code> и <code>DROP OWNED</code>).</li>
+        </ul>
+      </div>
+    </article>
+  </main>
+</div>
+</body>
+</html>

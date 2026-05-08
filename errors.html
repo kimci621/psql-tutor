@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Частые ошибки PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Ошибки</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Частые ошибки PostgreSQL</h1>
+    <p class="page-lead">
+      Сборник сообщений, с которыми сталкиваешься чаще всего. Для каждой ошибки описана причина,
+      пример воспроизведения и пути исправления. Кнопка «Поучиться с ИИ» открывает диалог,
+      в котором ментор поможет диагностировать ошибку наводящими вопросами.
+    </p>
+
+    <article class="error-card" id="err-relation-does-not-exist">
+      <h3>relation "X" does not exist</h3>
+      <div class="sqlstate">SQLSTATE 42P01</div>
+      <p>Сервер не нашёл таблицу с таким именем в текущем <code>search_path</code>.</p>
+
+      <div class="label">Воспроизведение</div>
+      <div class="code-block">
+        <pre>SELECT * FROM Users;        -- если таблица называется "Users" с кавычками
+SELECT * FROM other.users;  -- схема other отсутствует или нет прав</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-relation-does-not-exist">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+
+      <div class="label">Причины</div>
+      <ul>
+        <li>опечатка в имени таблицы или схемы;</li>
+        <li>таблица создавалась с двойными кавычками — теперь имя чувствительно к регистру;</li>
+        <li>нужная схема не входит в <code>search_path</code>;</li>
+        <li>у роли нет прав <code>USAGE</code> на схему — таблицу «не видно».</li>
+      </ul>
+
+      <div class="label">Как исправить</div>
+      <ol>
+        <li>Проверь <code>SHOW search_path;</code> и при необходимости расширь его.</li>
+        <li>Используй полное имя <code>schema.table</code>.</li>
+        <li>Найди реальное имя через <code>\dt *.X</code> в psql.</li>
+      </ol>
+    </article>
+
+    <article class="error-card" id="err-duplicate-key">
+      <h3>duplicate key value violates unique constraint "..."</h3>
+      <div class="sqlstate">SQLSTATE 23505</div>
+      <p>Нарушено уникальное ограничение (PRIMARY KEY или UNIQUE).</p>
+
+      <div class="code-block">
+        <pre>INSERT INTO users (email) VALUES ('a@example.com')
+ON CONFLICT (email) DO NOTHING;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-duplicate-key">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+
+      <div class="label">Что делать</div>
+      <ul>
+        <li>посмотри, какой именно индекс упомянут в сообщении (имя в кавычках);</li>
+        <li>если это идемпотентная вставка — добавь <code>ON CONFLICT</code>;</li>
+        <li>если это гонка двух транзакций — нужна транзакция с <code>SELECT … FOR UPDATE</code> или повторная попытка.</li>
+      </ul>
+    </article>
+
+    <article class="error-card" id="err-not-null">
+      <h3>null value in column "X" violates not-null constraint</h3>
+      <div class="sqlstate">SQLSTATE 23502</div>
+      <p>В обязательный столбец передан NULL — явно или потому что он отсутствует в <code>INSERT</code>.</p>
+
+      <div class="code-block">
+        <pre>ALTER TABLE users ALTER COLUMN email SET DEFAULT '';
+-- или передать значение явно при INSERT</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-not-null">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="error-card" id="err-fk">
+      <h3>insert or update on table "..." violates foreign key constraint</h3>
+      <div class="sqlstate">SQLSTATE 23503</div>
+      <p>Запись ссылается на несуществующего родителя или родителя удаляют без CASCADE.</p>
+
+      <div class="code-block">
+        <pre>ALTER TABLE orders DROP CONSTRAINT orders_user_id_fkey,
+  ADD CONSTRAINT orders_user_id_fkey
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-fk">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+
+      <div class="label">Что проверить</div>
+      <ul>
+        <li>порядок вставок: сначала родитель, потом ребёнок;</li>
+        <li>правила <code>ON DELETE</code> и <code>ON UPDATE</code>;</li>
+        <li>вспомогательные индексы на FK-столбцах для производительности.</li>
+      </ul>
+    </article>
+
+    <article class="error-card" id="err-syntax">
+      <h3>syntax error at or near "…"</h3>
+      <div class="sqlstate">SQLSTATE 42601</div>
+      <p>Ошибка синтаксиса. Сервер указывает позицию символа, на котором парсер «сорвался».</p>
+
+      <div class="code-block">
+        <pre>SELECT id, name FROM users WHERE id = 1;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-syntax">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+
+      <div class="label">Типичные причины</div>
+      <ul>
+        <li>висящая запятая перед <code>FROM</code>;</li>
+        <li>зарезервированное слово в качестве имени без кавычек (<code>"order"</code>);</li>
+        <li>незакрытая строка или кавычка;</li>
+        <li>точка с запятой внутри блока, где её быть не должно.</li>
+      </ul>
+    </article>
+
+    <article class="error-card" id="err-permission-denied">
+      <h3>permission denied for table / relation / schema</h3>
+      <div class="sqlstate">SQLSTATE 42501</div>
+      <p>Ролью не выдан нужный набор прав. Часто помогает связка <code>USAGE</code> на схему + права на таблицы.</p>
+
+      <div class="code-block">
+        <pre>GRANT USAGE  ON SCHEMA public TO app_user;
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON ALL TABLES IN SCHEMA public TO app_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-permission-denied">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="error-card" id="err-division-by-zero">
+      <h3>division by zero</h3>
+      <div class="sqlstate">SQLSTATE 22012</div>
+      <p>Попытка деления на ноль в выражении.</p>
+
+      <div class="code-block">
+        <pre>SELECT a / NULLIF(b, 0) FROM t;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-division-by-zero">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <p><code>NULLIF(b, 0)</code> заменит ноль на <code>NULL</code>, и результат деления тоже станет <code>NULL</code>. Если нужно конкретное значение — оберни в <code>COALESCE</code>.</p>
+    </article>
+
+    <article class="error-card" id="err-invalid-input">
+      <h3>invalid input syntax for type …</h3>
+      <div class="sqlstate">SQLSTATE 22P02 / 22008</div>
+      <p>Строку не удалось привести к нужному типу: дате, числу, uuid и т. п.</p>
+
+      <div class="code-block">
+        <pre>-- Плохо: формат зависит от datestyle
+SELECT '07.05.2026'::date;
+
+-- Хорошо: явный формат
+SELECT to_date('07.05.2026','DD.MM.YYYY');</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-invalid-input">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="error-card" id="err-deadlock">
+      <h3>deadlock detected</h3>
+      <div class="sqlstate">SQLSTATE 40P01</div>
+      <p>Две транзакции взаимно ждут блокировок друг друга. Postgres сам выбирает «жертву» и откатывает её.</p>
+
+      <div class="code-block">
+        <pre>-- Транзакция A: UPDATE accounts WHERE id = 1;
+-- Транзакция B: UPDATE accounts WHERE id = 2;
+-- Транзакция A: UPDATE accounts WHERE id = 2;  -- ждёт B
+-- Транзакция B: UPDATE accounts WHERE id = 1;  -- → deadlock</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-deadlock">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <p>Решение: упорядочивай захват блокировок (всегда по <code>id ASC</code>), уменьшай время удержания, добавляй retry.</p>
+    </article>
+
+    <article class="error-card" id="err-serialization">
+      <h3>could not serialize access due to concurrent update</h3>
+      <div class="sqlstate">SQLSTATE 40001</div>
+      <p>Сериализационный конфликт в <code>REPEATABLE READ</code> или <code>SERIALIZABLE</code>. Это не баг, а контракт уровня изоляции — нужен retry.</p>
+
+      <div class="code-block">
+        <pre>BEGIN ISOLATION LEVEL SERIALIZABLE;
+-- ваши запросы
+COMMIT;
+-- при ошибке 40001 повторить транзакцию (с экспоненциальной задержкой)</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-serialization">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="error-card" id="err-too-many-connections">
+      <h3>too many connections / out of shared memory</h3>
+      <div class="sqlstate">SQLSTATE 53300 / 53200</div>
+      <p>Превышен лимит подключений или закончилась общая память.</p>
+
+      <div class="code-block">
+        <pre>SHOW max_connections;
+SELECT count(*) FROM pg_stat_activity;
+SELECT pid, state, query
+FROM   pg_stat_activity
+WHERE  state &lt;&gt; 'idle' AND backend_type = 'client backend'
+ORDER  BY query_start;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-too-many-connections">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <p>Реальное решение — пуллер соединений (PgBouncer/PgPool) и закрытие idle-сессий.</p>
+    </article>
+
+    <article class="error-card" id="err-statement-timeout">
+      <h3>canceling statement due to statement timeout</h3>
+      <div class="sqlstate">SQLSTATE 57014</div>
+      <p>Запрос превысил <code>statement_timeout</code>. Ставится в постгресе целенаправленно, чтобы запросы-«утечки» не висели.</p>
+
+      <div class="code-block">
+        <pre>-- На уровне сессии:
+SET statement_timeout = '5s';
+
+-- Постоянно для роли:
+ALTER ROLE app_user SET statement_timeout = '5s';</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-statement-timeout">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="error-card" id="err-database-in-use">
+      <h3>database "X" is being accessed by other users</h3>
+      <div class="sqlstate">SQLSTATE 55006</div>
+      <p>К БД подключены клиенты, поэтому её нельзя удалить или переименовать.</p>
+
+      <div class="code-block">
+        <pre>SELECT pg_terminate_backend(pid)
+FROM   pg_stat_activity
+WHERE  datname = 'shop' AND pid &lt;&gt; pg_backend_pid();
+
+DROP DATABASE shop WITH (FORCE);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-database-in-use">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="error-card" id="err-role-exists">
+      <h3>role "X" already exists / does not exist</h3>
+      <div class="sqlstate">SQLSTATE 42710 / 42704</div>
+      <p>Перед удалением роли отзывай её права и переназначай владение объектами.</p>
+
+      <div class="code-block">
+        <pre>REASSIGN OWNED BY old_user TO new_user;
+DROP OWNED BY old_user;
+DROP ROLE IF EXISTS old_user;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="err-role-exists">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+    </article>
+
+    <p style="color: var(--text-muted); margin-top: 40px; font-size: 13px;">
+      Тексты сообщений ошибок воспроизведены так, как их выдаёт сервер PostgreSQL.
+    </p>
+  </main>
+</div>
+</body>
+</html>

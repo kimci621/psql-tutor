@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Гайд: VACUUM в PostgreSQL</title>
+<link rel="stylesheet" href="../assets/styles.css">
+<script type="module" src="../assets/app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="../index.html">Шпаргалка</a></li>
+      <li><a href="../errors.html">Частые ошибки</a></li>
+      <li><a href="../senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="list-tables.html">Список таблиц</a></li>
+      <li><a href="create-table.html">Создание таблицы</a></li>
+      <li><a href="vacuum.html">VACUUM</a></li>
+      <li><a href="list-users.html">Список пользователей</a></li>
+      <li><a href="create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs"><a href="../index.html">Главная</a> · Гайд · VACUUM</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">VACUUM: зачем нужен и как использовать</h1>
+    <p class="page-lead">
+      В PostgreSQL принят MVCC: каждое <code>UPDATE</code> и <code>DELETE</code> не меняет старую строку «на месте», а оставляет её
+      как «мёртвую версию» (<em>dead tuple</em>). <code>VACUUM</code> — фоновая операция, освобождающая такие версии и поддерживающая
+      статистику для планировщика.
+    </p>
+
+    <article class="topic" id="g-v-why">
+      <h3>Почему это важно</h3>
+      <div class="desc">
+        <p>Без уборки таблица «пухнет»: место в файле растёт, кэш засоряется, индексы становятся менее эффективными.
+        Со временем это превращается в проблему производительности и в риск переполнения 32-битного счётчика транзакций (txid wraparound).</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-v-cmds">
+      <h3>Команды VACUUM</h3>
+      <p class="summary">Обычный, с ANALYZE, FULL и INDEX_CLEANUP.</p>
+      <div class="code-block">
+        <pre>-- Лёгкая уборка (не блокирует чтения и записи):
+VACUUM orders;
+
+-- Уборка + обновление статистики:
+VACUUM (VERBOSE, ANALYZE) orders;
+
+-- Жёсткая перезапись таблицы (блокирует ACCESS EXCLUSIVE):
+VACUUM FULL orders;
+
+-- С PG 12+: пропустить очистку индексов (быстрее, но индексы могут раздуваться):
+VACUUM (INDEX_CLEANUP off) orders;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-vacuum">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p><code>VACUUM</code> освобождает место <em>внутри файла</em> таблицы — операционная система место не получает. Это сделает только <code>VACUUM FULL</code>, но он переписывает таблицу и берёт эксклюзивную блокировку.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-v-monitor">
+      <h3>Как понять, что таблица нуждается в уборке</h3>
+      <div class="code-block">
+        <pre>SELECT relname,
+       n_live_tup,
+       n_dead_tup,
+       round(n_dead_tup::numeric / NULLIF(n_live_tup,0), 2) AS dead_ratio,
+       last_vacuum,
+       last_autovacuum
+FROM   pg_stat_user_tables
+ORDER  BY n_dead_tup DESC
+LIMIT  20;</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-vacuum">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p>Если <code>n_dead_tup</code> исчисляется миллионами, а <code>last_autovacuum</code> старый — autovacuum не успевает.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-v-autovacuum">
+      <h3>Autovacuum</h3>
+      <p class="summary">Фоновый процесс, который запускается сам, если таблица «нагрелась».</p>
+      <div class="code-block">
+        <pre>-- Подкручиваем параметры для конкретной горячей таблицы:
+ALTER TABLE orders SET (
+  autovacuum_vacuum_scale_factor   = 0.05,
+  autovacuum_analyze_scale_factor  = 0.05,
+  autovacuum_vacuum_cost_limit     = 1000
+);</pre>
+        <div class="code-actions">
+          <button class="btn btn-copy">📋 Копировать</button>
+          <button class="btn" data-topic-id="guide-vacuum">💬 Поучиться с ИИ</button>
+        </div>
+      </div>
+      <div class="desc">
+        <p><code>autovacuum_vacuum_scale_factor</code> — доля dead tuples, при которой autovacuum просыпается. По умолчанию 0.2 (20%) — для очень больших таблиц это много, имеет смысл уменьшить.</p>
+      </div>
+    </article>
+
+    <article class="topic" id="g-v-pitfalls">
+      <h3>Подводные камни</h3>
+      <div class="desc">
+        <ul>
+          <li><strong>Долгие транзакции</strong> блокируют уборку: пока есть открытая транзакция, начавшаяся раньше создания мёртвой строки, её нельзя удалить. Следи за <code>idle in transaction</code> в <code>pg_stat_activity</code>.</li>
+          <li><strong>VACUUM FULL</strong> на проде требует окна и достаточно места — он создаёт копию таблицы.</li>
+          <li><strong>Реплика</strong> может откладывать уборку через <code>hot_standby_feedback</code>; на нагруженных репликах это превращается в раздувание.</li>
+          <li><strong>TRUNCATE</strong> — не альтернатива VACUUM в общем случае, но если таблица — буфер/очередь и её можно полностью очистить, то <code>TRUNCATE</code> мгновенно вернёт место.</li>
+        </ul>
+      </div>
+    </article>
+  </main>
+</div>
+</body>
+</html>
