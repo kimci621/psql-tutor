@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Транзакции и изоляция — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Транзакции</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Транзакции, ACID и уровни изоляции</h1>
+    <p class="page-lead">
+      ACID-гарантии, savepoints, материализация CTE, и подробный разбор всех уровней изоляции
+      по отдельности — что именно меняется и какие аномалии возможны.
+    </p>
+
+    <section class="category">
+      <h2>1. ACID</h2>
+
+      <article class="topic concept" id="acid">
+        <h3>ACID — четыре буквы за словом «транзакция»</h3>
+        <p class="summary">Atomicity, Consistency, Isolation, Durability.</p>
+        <div class="desc">
+          <ul>
+            <li><strong>A — Atomicity.</strong> Транзакция либо вся применяется, либо вся откатывается. Между «полу-применённое» состояние недопустимо.</li>
+            <li><strong>C — Consistency.</strong> После транзакции БД остаётся в валидном состоянии: все ограничения (FK, CHECK, UNIQUE) выполнены. Это не «согласованность» из CAP-теоремы.</li>
+            <li><strong>I — Isolation.</strong> Параллельные транзакции не видят промежуточных результатов друг друга. На практике — спектр уровней (см. ниже).</li>
+            <li><strong>D — Durability.</strong> Закоммиченные изменения переживают падение сервера. В Postgres за это отвечает WAL и <code>fsync</code>.</li>
+          </ul>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="acid">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. CTE и материализация</h2>
+
+      <article class="topic" id="cte-materialized">
+        <h3>CTE: MATERIALIZED vs NOT MATERIALIZED</h3>
+        <p class="summary">С PG 12+ planner может встраивать CTE в основной запрос. Иногда нужен явный барьер.</p>
+        <div class="code-block">
+          <pre>-- по умолчанию (PG 12+):
+WITH heavy AS (
+  SELECT id, expensive_func(x) AS v FROM big
+)
+SELECT * FROM heavy WHERE v &gt; 0;
+
+-- явно материализуем — CTE выполнится один раз:
+WITH heavy AS MATERIALIZED (
+  SELECT id, expensive_func(x) AS v FROM big
+)
+SELECT * FROM heavy WHERE v &gt; 0;
+
+-- явно встраиваем — даже если ссылка единственная:
+WITH heavy AS NOT MATERIALIZED (
+  SELECT * FROM big
+)
+SELECT * FROM heavy WHERE id &lt; 100;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cte-materialized">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Если внутри CTE — медленная функция, и ссылок несколько, <code>MATERIALIZED</code> сэкономит время. В EXPLAIN видно: <code>CTE Scan</code> — материализован; иначе — встроен в основной план.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Savepoints</h2>
+
+      <article class="topic" id="savepoints">
+        <h3>Точки сохранения</h3>
+        <p class="summary">Частичный откат внутри одной транзакции.</p>
+        <div class="code-block">
+          <pre>BEGIN;
+  INSERT INTO orders (user_id, total) VALUES ($1, $2) RETURNING id;
+
+  SAVEPOINT before_items;
+  INSERT INTO order_items (...) VALUES (...);
+  -- если что-то пошло не так:
+  ROLLBACK TO SAVEPOINT before_items;
+
+  -- продолжаем работу:
+  INSERT INTO order_items (...) VALUES (...);
+  RELEASE  SAVEPOINT before_items;   -- savepoint больше не нужен
+COMMIT;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="savepoints">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>ORM-ы используют savepoints для эмуляции «вложенных транзакций». Десятки тысяч savepoint в одной транзакции — это десятки тысяч сабтранзакций; на больших объёмах они начинают тормозить кластер.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Уровни изоляции</h2>
+      <p class="sub">По отдельности — что меняется на каждом.</p>
+
+      <article class="topic" id="iso-read-uncommitted-committed">
+        <h3>READ UNCOMMITTED / READ COMMITTED</h3>
+        <p class="summary">В Postgres первый ведёт себя как второй. READ COMMITTED — уровень по умолчанию.</p>
+        <div class="code-block">
+          <pre>BEGIN ISOLATION LEVEL READ COMMITTED;
+  SELECT balance FROM accounts WHERE id = 1;   -- 1000
+  -- параллельная транзакция COMMIT-ит UPDATE
+  SELECT balance FROM accounts WHERE id = 1;   -- может стать 1500
+COMMIT;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="iso-read-uncommitted-committed">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Каждый запрос получает свой снимок. <em>Dirty read</em> в Postgres невозможен ни на одном уровне. <em>Non-repeatable read</em> возможен — два одинаковых SELECT внутри одной транзакции могут вернуть разное.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="iso-repeatable-read">
+        <h3>REPEATABLE READ</h3>
+        <p class="summary">Снимок берётся один раз в начале транзакции и больше не меняется.</p>
+        <div class="code-block">
+          <pre>BEGIN ISOLATION LEVEL REPEATABLE READ;
+  SELECT balance FROM accounts WHERE id = 1;   -- 1000
+  -- параллельная транзакция COMMIT-ит UPDATE
+  SELECT balance FROM accounts WHERE id = 1;   -- по-прежнему 1000
+
+  UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+  -- возможно: ERROR: could not serialize access due to concurrent update
+COMMIT;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="iso-repeatable-read">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Защищает от non-repeatable read и phantom read внутри снимка. Не защищает от <em>write skew</em>: две транзакции читают одно состояние и пишут разное — обе коммитят.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="iso-serializable">
+        <h3>SERIALIZABLE</h3>
+        <p class="summary">Эффект параллельных транзакций должен совпадать с каким-то их последовательным выполнением.</p>
+        <div class="code-block">
+          <pre>BEGIN ISOLATION LEVEL SERIALIZABLE;
+  -- запросы и обновления;
+COMMIT;
+-- При SQLSTATE 40001 (could not serialize access) —
+-- сделать backoff и повторить транзакцию целиком.
+
+-- В приложении это выглядит примерно так:
+-- for attempt in 1..MAX_ATTEMPTS:
+--   try:
+--     run_transaction()
+--     break
+--   except SerializationFailure:
+--     sleep(backoff(attempt))</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="iso-serializable">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Реализация называется SSI — Serializable Snapshot Isolation. Гарантия корректности достигается ценой <em>retry</em>: при конфликте Postgres откатывает одну из сторон. Удобно для бизнес-логики, тяжело — для горячих счётчиков (там лучше явные блокировки).</p>
+        </div>
+      </article>
+
+      <article class="topic concept" id="iso-summary">
+        <h3>Сводная таблица</h3>
+        <p class="summary">Что возможно на каждом уровне в Postgres.</p>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr>
+              <th>Уровень</th>
+              <th>Dirty read</th>
+              <th>Non-repeatable read</th>
+              <th>Phantom read</th>
+              <th>Write skew</th>
+              <th>Возможен 40001</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>READ UNCOMMITTED *</td><td>—</td><td>возможен</td><td>возможен</td><td>возможен</td><td>нет</td></tr>
+              <tr><td>READ COMMITTED (default)</td><td>—</td><td>возможен</td><td>возможен</td><td>возможен</td><td>нет</td></tr>
+              <tr><td>REPEATABLE READ</td><td>—</td><td>—</td><td>—</td><td>возможен</td><td>да</td></tr>
+              <tr><td>SERIALIZABLE</td><td>—</td><td>—</td><td>—</td><td>—</td><td>да</td></tr>
+            </tbody>
+          </table>
+          <p><small>* В Postgres READ UNCOMMITTED ведёт себя как READ COMMITTED.</small></p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="iso-summary">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Где ещё про транзакции</h2>
+      <p class="sub">Эти темы уже есть на других страницах.</p>
+      <article class="topic concept">
+        <h3>Связанные темы</h3>
+        <div class="desc">
+          <ul>
+            <li><strong>Транзакции на практике</strong> — на главной, тема <a href="index.html#transactions">«Транзакции и уровни изоляции»</a>.</li>
+            <li><strong>Блокировки строк</strong> — на главной, <a href="index.html#locks">«FOR UPDATE SKIP LOCKED»</a>.</li>
+            <li><strong>MVCC и снимки</strong> — на странице <a href="senior.html#sr-mvcc-snapshot">Senior-уровня</a>.</li>
+            <li><strong>Advisory locks</strong> — там же, <a href="senior.html#sr-advisory-locks">«Advisory locks»</a>.</li>
+            <li><strong>Серилизационные ошибки</strong> — на странице <a href="errors.html#err-serialization">«Частые ошибки»</a>.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

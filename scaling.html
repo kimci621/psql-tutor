@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Масштабирование PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Масштабирование</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Масштабирование, шардирование, CAP, PK и UUID</h1>
+    <p class="page-lead">
+      Как PostgreSQL «растягивается» вертикально и горизонтально, что такое шардирование и
+      когда оно действительно нужно, теорема CAP и её практические следствия, выбор PK и
+      работа с UUID.
+    </p>
+
+    <section class="category">
+      <h2>1. Вертикальное и горизонтальное</h2>
+
+      <article class="topic concept" id="scaling-h-v">
+        <h3>Vertical vs Horizontal scaling</h3>
+        <p class="summary">Сначала растягиваем одну машину, потом — несколько.</p>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr><th>Стратегия</th><th>Что делаем</th><th>Когда применять</th></tr></thead>
+            <tbody>
+              <tr><td>Оптимизация запросов</td><td>EXPLAIN, индексы, переписать SQL</td><td>Всегда первым шагом</td></tr>
+              <tr><td>Vertical (scale up)</td><td>больше CPU, RAM, NVMe</td><td>Пока хватает потолка одной машины</td></tr>
+              <tr><td>Read-replicas</td><td>несколько реплик на чтение</td><td>Read-heavy нагрузка</td></tr>
+              <tr><td>Партиционирование</td><td>одну большую таблицу режем на партиции</td><td>Сотни ГБ в одной таблице</td></tr>
+              <tr><td>Шардирование</td><td>данные на нескольких кластерах</td><td>Когда исчерпан scale up</td></tr>
+            </tbody>
+          </table>
+          <p>Postgres сам по себе — single-master. «Горизонтально» в первую очередь означает реплики на чтение и продуманное партиционирование. Шардирование — ультима ратио.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="scaling-h-v">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. Шардирование</h2>
+
+      <article class="topic" id="sharding">
+        <h3>Sharding — разбиение по ключу</h3>
+        <p class="summary">Application-level или через расширения вроде Citus.</p>
+        <div class="code-block">
+          <pre>-- 1. Application-level: маршрутизирует приложение или прокси.
+--    shard_id = user_id % N
+--    запросы к шарду делаются по обычному соединению.
+
+-- 2. Citus (расширение Postgres):
+CREATE EXTENSION citus;
+
+CREATE TABLE orders (
+  id      bigint GENERATED ALWAYS AS IDENTITY,
+  user_id bigint NOT NULL,
+  total   numeric(12,2) NOT NULL,
+  PRIMARY KEY (user_id, id)
+);
+
+SELECT create_distributed_table('orders', 'user_id');
+-- теперь Citus сам распределяет данные между worker-нодами по user_id</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sharding">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Главное правило: проектируй ключ так, чтобы 95% запросов укладывались в один шард. Cross-shard JOIN-ы и транзакции — дорогая магия.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. CAP / PACELC</h2>
+
+      <article class="topic concept" id="cap-theorem">
+        <h3>Теорема CAP — и что из неё следует</h3>
+        <p class="summary">При сетевом сбое распределённая система выбирает между Consistency и Availability.</p>
+        <div class="desc">
+          <p><strong>CAP:</strong> при partition (P) системе остаётся выбор — отдать либо Consistency, либо Availability. Поэтому архитектуру характеризуют как CP или AP.</p>
+          <p><strong>PACELC:</strong> расширение, говорящее, что выбор есть и в штатной работе — между Latency и Consistency. Postgres-кластер с синхронной репликацией — PC/EC; с асинхронной — PA/EL.</p>
+          <p><strong>Важно:</strong> C из CAP — это linearizability, а C из ACID — выполнение ограничений БД. Не путай.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="cap-theorem">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. PRIMARY KEY и UUID</h2>
+
+      <article class="topic" id="pk-choice">
+        <h3>Что использовать в качестве PK</h3>
+        <p class="summary">bigint identity (default), uuid v4, uuid v7/ULID, natural key.</p>
+        <div class="code-block">
+          <pre>-- Современный default — bigint identity, монотонно растущий:
+id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+
+-- UUID v4 (случайный) — легко генерить на клиенте:
+id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+
+-- UUID v7 — упорядочен по времени (ULID),
+-- сейчас обычно генерится приложением (драйвер/библиотека):
+id uuid PRIMARY KEY  -- значение приходит извне</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="pk-choice">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr><th>Тип</th><th>Размер</th><th>Локальность вставок</th><th>Когда брать</th></tr></thead>
+            <tbody>
+              <tr><td>bigint identity</td><td>8 байт</td><td>отличная</td><td>Все стандартные сценарии</td></tr>
+              <tr><td>uuid v4</td><td>16 байт</td><td>плохая</td><td>Распределённая генерация без координации</td></tr>
+              <tr><td>uuid v7 / ULID</td><td>16 байт</td><td>хорошая</td><td>Та же распределённая генерация, но уже без боли B-tree</td></tr>
+              <tr><td>natural key</td><td>—</td><td>зависит</td><td>Почти никогда — нестабилен и неудобен для FK</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="topic" id="uuid">
+        <h3>UUID в PostgreSQL</h3>
+        <p class="summary">Тип <code>uuid</code> и встроенный <code>gen_random_uuid()</code> с PG 13+.</p>
+        <div class="code-block">
+          <pre>SELECT gen_random_uuid();   -- встроено с PG 13
+
+-- до PG 13 — через расширение:
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE events (
+  id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ts   timestamptz NOT NULL DEFAULT now(),
+  data jsonb
+);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="uuid">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>uuid</code> хранится в 16 байтах (а не 36 символов канонического вида). Индексы по uuid в 1.5–2 раза больше, чем по <code>bigint</code>; vt v4 ещё и плохо ложится в B-tree из-за случайности.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="uuid-short">
+        <h3>Сокращение UUID для UI/URL</h3>
+        <p class="summary">22 символа base64url вместо 36 канонических.</p>
+        <div class="code-block">
+          <pre>-- 22 символа base64url (urlsafe), без padding:
+SELECT replace(
+         replace(
+           rtrim(encode(uuid_send(gen_random_uuid()), 'base64'), '='),
+         '+','-'),
+       '/','_') AS short_id;
+
+-- пример: cm5xR3a7T0WvO_aYpKJg5w</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="uuid-short">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Base58 (без 0/O/I/l) тоже популярен: получится строка длиной 22 символа без визуально похожих знаков. Хранить в БД при этом продолжаешь обычный <code>uuid</code> — короткий вид нужен только для UI.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. OLTP и OLAP</h2>
+
+      <article class="topic concept" id="oltp-olap">
+        <h3>OLTP vs OLAP</h3>
+        <p class="summary">Профили нагрузки и какой инструмент выбирать.</p>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr><th></th><th>OLTP</th><th>OLAP</th></tr></thead>
+            <tbody>
+              <tr><td>Тип запросов</td><td>Много мелких, ms-латентность</td><td>Длинные SELECT, секунды-минуты</td></tr>
+              <tr><td>Объёмы данных</td><td>Десятки ГБ, иногда ТБ</td><td>ТБ–ПБ</td></tr>
+              <tr><td>Структура</td><td>Нормализованная</td><td>Денормализация, звёздная схема</td></tr>
+              <tr><td>Хранилище</td><td>Postgres, MySQL</td><td>ClickHouse, BigQuery, DuckDB, Snowflake</td></tr>
+              <tr><td>На Postgres</td><td>Прекрасно</td><td>До определённого объёма; дальше — отдельный movemen</td></tr>
+            </tbody>
+          </table>
+          <p>Часто на проде ставят реплику Postgres под аналитические запросы, чтобы не мешать «горячему» OLTP. Для time-series — TimescaleDB поверх Postgres.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="oltp-olap">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Связанные темы</h2>
+      <article class="topic concept">
+        <h3>Где ещё про эксплуатацию</h3>
+        <div class="desc">
+          <ul>
+            <li><a href="senior.html#sr-replication">Репликация streaming/logical</a> — на странице Senior.</li>
+            <li><a href="senior.html#sr-partitioning">Декларативное партиционирование</a>.</li>
+            <li><a href="senior.html#sr-pgbouncer">PgBouncer и пулы соединений</a>.</li>
+            <li><a href="senior.html#sr-backup-pitr">Бэкапы и PITR</a>.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

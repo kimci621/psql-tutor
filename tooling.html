@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Инструменты для работы с PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Тулинг</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Инструменты: psql, pgcli, pgpass, размеры, SQLite-сравнение</h1>
+    <p class="page-lead">
+      Повседневные инструменты разработчика и DBA: CLI и GUI, удобные психологии psql,
+      безопасное хранение паролей, отчёт по размерам и место SQLite в общей картине.
+    </p>
+
+    <section class="category">
+      <h2>1. Клиенты</h2>
+
+      <article class="topic" id="tools-overview">
+        <h3>psql, pgcli, DBeaver, PyCharm</h3>
+        <p class="summary">CLI-классика и GUI-альтернативы.</p>
+        <div class="code-block">
+          <pre># psql — стандартный, есть везде:
+psql -h 127.0.0.1 -U postgres -d app
+
+# pgcli — CLI с автодополнением и подсветкой:
+pip install pgcli
+pgcli postgres://user:pass@host/db
+
+# DBeaver — кросс-платформенный GUI, поддерживает все мажорные СУБД.
+# PyCharm/IntelliJ — встроенные Database Tools, удобны внутри IDE.</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="tools-overview">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr><th>Инструмент</th><th>Сильная сторона</th><th>Слабая</th></tr></thead>
+            <tbody>
+              <tr><td>psql</td><td>Везде, скриптуемый, метакоманды</td><td>Без автодополнения и подсветки «из коробки»</td></tr>
+              <tr><td>pgcli</td><td>Удобный интерактив</td><td>Только Python, в скриптах не нужен</td></tr>
+              <tr><td>DBeaver</td><td>GUI, диаграммы, ER</td><td>Тяжёлый, JVM</td></tr>
+              <tr><td>PyCharm DB</td><td>Внутри IDE, автодополнение по схеме</td><td>Платная Pro</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="topic" id="psql-tricks">
+        <h3>Хитрости psql и pgcli</h3>
+        <p class="summary">Метакоманды, которые сильно сокращают рутину.</p>
+        <div class="code-block">
+          <pre>\timing on                       -- показывать время выполнения каждого запроса
+\watch 2                         -- повторять последний запрос каждые 2 секунды
+\edit                            -- открыть последний запрос в $EDITOR
+\copy users TO 'users.csv' CSV HEADER
+\copy users FROM 'users.csv' CSV HEADER
+\set ECHO_HIDDEN on              -- показывать SQL за метакомандами (\d и т. д.)
+\gexec                           -- выполнить результат предыдущего SELECT как SQL
+\set HISTSIZE 100000             -- увеличить историю команд
+\x auto                          -- авто-режим расширенного вывода
+\d   users                       -- описание таблицы
+\d+  users                       -- + размеры и комментарии
+\df  myfunc*                     -- список функций по маске
+\sf  myfunc                      -- показать тело функции
+\ef  myfunc                      -- открыть функцию в редакторе</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="psql-tricks">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>\copy</code> идёт через клиент (используй для локальных файлов), серверная <code>COPY</code> — через сервер. <code>\gexec</code> очень полезен для метапрограммирования: например, «сгенерировать DROP-команды для всех таблиц схемы» — но требует осторожности.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. .pgpass</h2>
+
+      <article class="topic" id="pgpass">
+        <h3>Безопасное хранение паролей</h3>
+        <p class="summary">Файл <code>~/.pgpass</code> избавляет от повторного ввода пароля и не светит его в process list.</p>
+        <div class="code-block">
+          <pre># ~/.pgpass
+# формат: hostname:port:database:username:password
+127.0.0.1:5432:*:postgres:secret
+prod-db.example.com:5432:app:app_user:abc123def
+*:*:replica_db:replicator:repl_secret
+
+# Права обязательны (иначе psql проигнорирует файл):
+chmod 600 ~/.pgpass
+
+# Теперь подключение без -W:
+psql -h 127.0.0.1 -U postgres -d app
+
+# Альтернатива — переменные:
+export PGPASSWORD=secret    # видна в `ps -ef`, лучше избегать
+export PGUSER=postgres
+export PGDATABASE=app</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="pgpass">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>*</code> — wildcard в любом поле. На Windows файл лежит в <code>%APPDATA%/postgresql/pgpass.conf</code> и про права заботиться не нужно.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Размеры БД, таблиц, индексов</h2>
+
+      <article class="topic" id="db-sizes">
+        <h3>Сколько весят данные</h3>
+        <p class="summary">Функции <code>pg_database_size</code>, <code>pg_total_relation_size</code>, <code>pg_size_pretty</code>.</p>
+        <div class="code-block">
+          <pre>-- размер каждой БД:
+SELECT datname,
+       pg_size_pretty(pg_database_size(datname)) AS size
+FROM   pg_database
+ORDER  BY pg_database_size(datname) DESC;
+
+-- топ-20 таблиц по полному размеру:
+SELECT n.nspname || '.' || c.relname              AS rel,
+       pg_size_pretty(pg_total_relation_size(c.oid))  AS total,
+       pg_size_pretty(pg_relation_size(c.oid))        AS heap,
+       pg_size_pretty(pg_indexes_size(c.oid))         AS indexes
+FROM   pg_class c
+JOIN   pg_namespace n ON n.oid = c.relnamespace
+WHERE  c.relkind = 'r'
+  AND  n.nspname NOT IN ('pg_catalog','information_schema')
+ORDER  BY pg_total_relation_size(c.oid) DESC
+LIMIT  20;
+
+-- размер каждого индекса конкретной таблицы:
+SELECT i.indexrelname,
+       pg_size_pretty(pg_relation_size(i.indexrelid)) AS size,
+       i.idx_scan                                     AS uses
+FROM   pg_stat_user_indexes i
+WHERE  i.relname = 'orders'
+ORDER  BY pg_relation_size(i.indexrelid) DESC;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="db-sizes">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>pg_relation_size</code> — только heap; <code>pg_total_relation_size</code> — heap + TOAST + индексы. Индекс с <code>idx_scan = 0</code> на боевой системе — кандидат на удаление: место и стоимость записи он жрёт, пользы не приносит.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. SQLite vs PostgreSQL</h2>
+
+      <article class="topic concept" id="sqlite-comparison">
+        <h3>Когда SQLite — лучший выбор</h3>
+        <p class="summary">Не любая задача требует Postgres. SQLite часто оптимальнее.</p>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr><th></th><th>SQLite</th><th>PostgreSQL</th></tr></thead>
+            <tbody>
+              <tr><td>Архитектура</td><td>Встраиваемая, файл на диске</td><td>Клиент-сервер</td></tr>
+              <tr><td>Конкуренция записи</td><td>Один писатель, много читателей</td><td>Много писателей и читателей</td></tr>
+              <tr><td>Размер данных</td><td>До нескольких ГБ комфортно</td><td>ГБ–ТБ</td></tr>
+              <tr><td>Типизация</td><td>Type affinity (мягкая)</td><td>Строгая</td></tr>
+              <tr><td>Расширения</td><td>FTS5, R-tree, JSON1</td><td>Огромная экосистема</td></tr>
+              <tr><td>Где брать</td><td>Мобильные приложения, локальные кеши, тесты, CLI-утилиты</td><td>Продовые бэкенды</td></tr>
+            </tbody>
+          </table>
+          <p>SQLite — идеальная встраиваемая БД. Тащить Postgres в моб-приложение или в маленькую CLI-утилиту обычно не нужно. Зато ставить SQLite вместо Postgres в нагруженный веб-сервис — тоже не лучшая идея: один писатель быстро становится бутылочным горлышком.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="sqlite-comparison">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Связанные темы</h2>
+      <article class="topic concept">
+        <h3>Где ещё</h3>
+        <div class="desc">
+          <ul>
+            <li><a href="index.html#psql-connect">Подключение через psql</a> — на главной.</li>
+            <li><a href="guides/list-tables.html">Гайд: список таблиц</a> — три способа.</li>
+            <li><a href="guides/list-users.html">Гайд: список пользователей</a>.</li>
+            <li><a href="senior.html#sr-observability">Наблюдаемость PostgreSQL</a> — slow log, метрики.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

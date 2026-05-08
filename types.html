@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Типы данных PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Типы данных</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Типы данных в PostgreSQL</h1>
+    <p class="page-lead">
+      Числа, строки, ENUM, boolean, массивы. JSON/JSONB и работа с датой и временем — на главной странице
+      шпаргалки и в Senior-разделе. Хороший выбор типа закладывает корректность и производительность на годы вперёд.
+    </p>
+
+    <section class="category">
+      <h2>1. Зачем нужны типы</h2>
+
+      <article class="topic concept" id="types-why">
+        <h3>Зачем нужны типы данных</h3>
+        <p class="summary">Тип — это контракт. Он отбраковывает мусор и сообщает планировщику, как хранить и сравнивать значения.</p>
+        <div class="desc">
+          <p>В text можно положить «понедельник» и «13/13/2026». Когда придёт момент посчитать «сколько заказов за прошлый месяц», окажется, что половина строк не парсится. Правильный тип на этапе схемы — самый дешёвый способ предотвратить такие баги.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="types-why">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. Числа</h2>
+
+      <article class="topic" id="types-numbers">
+        <h3>Числовые типы</h3>
+        <p class="summary">smallint / integer / bigint, numeric (точная), real / double precision (с плавающей точкой).</p>
+        <div class="code-block">
+          <pre>CREATE TABLE money_demo (
+  qty       integer        NOT NULL CHECK (qty &gt;= 0),
+  price     numeric(12,2)  NOT NULL,   -- точная арифметика
+  weight_kg double precision           -- быстрая, но с погрешностью
+);
+
+-- классическая ловушка float:
+SELECT 0.1::double precision + 0.2::double precision;   -- 0.30000000000000004
+SELECT 0.1::numeric          + 0.2::numeric;            -- 0.3</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-numbers">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Деньги — всегда <code>numeric(12,2)</code>. Целочисленные счётчики — <code>integer</code> или <code>bigint</code>. <code>double precision</code> — для научных вычислений, где погрешность приемлема, и измерений.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Строки</h2>
+
+      <article class="topic" id="types-strings">
+        <h3>Строковые типы</h3>
+        <p class="summary">text, varchar(n), char(n), bytea — и почему чаще всего нужен только text.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE strings_demo (
+  body  text,           -- любая длина, без ограничений; рабочая лошадка
+  code  varchar(16),    -- ограничение по длине; внутри хранится так же, как text
+  fixed char(8),        -- фиксированная длина с дополнением пробелами (почти не нужно)
+  raw   bytea           -- произвольные байты
+);
+
+SELECT length(body), char_length(body) FROM strings_demo;
+SELECT lower(body), upper(body), trim(body) FROM strings_demo;
+SELECT body || ' (правка)' FROM strings_demo;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-strings">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>В Postgres <code>varchar(n)</code> не быстрее <code>text</code>: длина проверяется отдельной операцией. <code>char(n)</code> заполняет пробелами до длины — обычно не то, что нужно. Для бинарных данных — <code>bytea</code>, но для крупных файлов лучше внешнее хранилище.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. ENUM</h2>
+
+      <article class="topic" id="types-enum">
+        <h3>Перечисления (ENUM)</h3>
+        <p class="summary">Строгий список значений, заданный на уровне типа.</p>
+        <div class="code-block">
+          <pre>CREATE TYPE order_status AS ENUM ('new','paid','shipped','cancelled');
+
+CREATE TABLE orders (
+  id     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  status order_status NOT NULL DEFAULT 'new'
+);
+
+-- добавить новое значение можно:
+ALTER TYPE order_status ADD VALUE 'returned';
+-- порядок определения определяет сравнение
+SELECT 'new'::order_status &lt; 'paid'::order_status;   -- TRUE</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-enum">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Удалить значение из ENUM нельзя — только пересоздать тип. Если набор значений динамический, используй обычную таблицу-справочник + FK. ENUM хорош для редко меняющихся, технических наборов.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Boolean</h2>
+
+      <article class="topic" id="types-boolean">
+        <h3>boolean</h3>
+        <p class="summary">TRUE / FALSE / NULL и удобные литералы.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE flags (
+  user_id   bigint PRIMARY KEY,
+  is_active boolean NOT NULL DEFAULT true
+);
+
+-- читать стоит без = TRUE — короче и идиоматичнее:
+SELECT * FROM flags WHERE     is_active;
+SELECT * FROM flags WHERE NOT is_active;
+
+-- Postgres принимает много вариантов литералов:
+SELECT 'yes'::boolean, 't'::boolean, 1::boolean, 'no'::boolean;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-boolean">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Помни про трёхзначную логику: <code>WHERE is_active</code> отбирает только TRUE; строки с NULL отбрасываются. Если важно тоже — пиши <code>WHERE coalesce(is_active, false)</code> или <code>IS NOT FALSE</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Массивы</h2>
+
+      <article class="topic" id="types-arrays">
+        <h3>Массивы</h3>
+        <p class="summary">Массив любой размерности из любого типа. Удобно — но нормализация часто лучше.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE posts (
+  id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  tags text[] NOT NULL DEFAULT '{}'
+);
+
+INSERT INTO posts (tags) VALUES
+  (ARRAY['sql','postgres']),
+  ('{python,db}');                       -- литерал тоже работает
+
+SELECT * FROM posts WHERE 'sql' = ANY (tags);
+SELECT * FROM posts WHERE tags @&gt; ARRAY['sql','postgres'];   -- содержит все
+SELECT id, unnest(tags) AS tag FROM posts;                   -- развернуть
+
+-- индекс для @&gt; и ANY:
+CREATE INDEX idx_posts_tags ON posts USING gin (tags);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-arrays">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Массивы хороши для коротких атрибутов вроде тегов. Если в массиве сотни значений, по которым ходят сложные условия — это сигнал нормализовать в отдельную таблицу. Индексы у массива 1-based: <code>tags[1]</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>7. Куда ещё посмотреть</h2>
+      <p class="sub">Темы, которые живут на других страницах.</p>
+
+      <article class="topic concept" id="types-more">
+        <h3>JSON, дата/время, UUID, диапазоны</h3>
+        <p class="summary">Эти типы достаточно объёмные, чтобы жить отдельно.</p>
+        <div class="desc">
+          <ul>
+            <li><strong>JSON / JSONB</strong> — на <a href="index.html#jsonb">главной странице</a> и в Senior-разделе.</li>
+            <li><strong>Дата и время</strong> — там же, тема <a href="index.html#datetime">«Дата и время»</a>.</li>
+            <li><strong>UUID</strong> и его сокращения — будут в разделе «Масштабирование».</li>
+            <li><strong>range</strong>-типы (<code>int4range</code>, <code>tstzrange</code>) — для диапазонов, см. документацию PostgreSQL.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

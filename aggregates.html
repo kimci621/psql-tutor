@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Агрегации и подзапросы — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Агрегации</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Агрегации, CASE, DISTINCT, подзапросы и set-операции</h1>
+    <p class="page-lead">
+      Всё, что превращает «много строк» в «один ответ»: агрегатные функции, фильтры
+      и группировки, борьба с N+1 через json_agg, ROLLUP/CUBE, подзапросы и UNION/EXCEPT/INTERSECT.
+    </p>
+
+    <section class="category">
+      <h2>1. Агрегатные функции</h2>
+
+      <article class="topic" id="aggregates-funcs">
+        <h3>count, sum, avg, min, max, string_agg, array_agg</h3>
+        <p class="summary">Стандартный набор плюс агрегаты-сборщики и FILTER для условий.</p>
+        <div class="code-block">
+          <pre>SELECT count(*)                 AS rows_total,
+       count(email)             AS with_email,
+       count(DISTINCT user_id)  AS uniq_users,
+       sum(amount)              AS total,
+       avg(amount)              AS avg_amount,
+       min(created_at)          AS first_seen,
+       max(created_at)          AS last_seen,
+       count(*) FILTER (WHERE status = 'paid')   AS paid_count,
+       count(*) FILTER (WHERE status = 'cancel') AS cancelled_count,
+       string_agg(email, ', ' ORDER BY email)    AS email_list,
+       array_agg(id ORDER BY id)                 AS ids
+FROM   orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="aggregates-funcs">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>count(*)</code> считает строки, <code>count(col)</code> — только не-NULL значения. <code>FILTER</code> идиоматичнее <code>CASE WHEN ... ELSE NULL END</code> внутри агрегата.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. JSON_AGG vs ORM</h2>
+
+      <article class="topic" id="json-agg-vs-orm">
+        <h3>Агрегация в JSON: один запрос вместо N+1</h3>
+        <p class="summary">Часто типичная «простыня» N+1 в ORM лечится одним SQL.</p>
+        <div class="code-block">
+          <pre>-- было в коде: для каждого пользователя — отдельный запрос за заказами.
+-- стало: один SQL, JSON-массив заказов уже в ответе.
+
+SELECT u.id,
+       u.email,
+       coalesce(
+         json_agg(
+           json_build_object(
+             'id',         o.id,
+             'total',      o.total,
+             'created_at', o.created_at
+           )
+           ORDER BY o.created_at DESC
+         ) FILTER (WHERE o.id IS NOT NULL),
+         '[]'::json
+       ) AS orders
+FROM   users u
+LEFT JOIN orders o ON o.user_id = u.id
+GROUP  BY u.id, u.email
+ORDER  BY u.id;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="json-agg-vs-orm">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>FILTER (WHERE o.id IS NOT NULL)</code> важна: без неё пользователь без заказов получит массив <code>[null]</code> вместо <code>[]</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. CASE WHEN</h2>
+
+      <article class="topic" id="case-when">
+        <h3>Условные выражения</h3>
+        <p class="summary">«Если X, то Y; иначе Z». Работает везде, где можно писать выражение.</p>
+        <div class="code-block">
+          <pre>SELECT id, total,
+       CASE
+         WHEN total = 0      THEN 'free'
+         WHEN total &lt; 1000   THEN 'small'
+         WHEN total &lt; 10000  THEN 'medium'
+         ELSE                     'big'
+       END AS bucket
+FROM   orders;
+
+-- альтернативная форма (когда сравниваем с одним выражением):
+SELECT id,
+       CASE status
+         WHEN 'new'    THEN 1
+         WHEN 'paid'   THEN 2
+         WHEN 'cancel' THEN 99
+       END AS status_order
+FROM   orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="case-when">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Без <code>ELSE</code> для непокрытых случаев возвращается NULL. Для условных агрегатов чаще читабельнее <code>FILTER (WHERE ...)</code>, чем <code>sum(CASE WHEN ... THEN 1 ELSE 0 END)</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Группировка и фильтрация</h2>
+
+      <article class="topic" id="having">
+        <h3>HAVING — фильтр после агрегации</h3>
+        <p class="summary"><code>WHERE</code> отбирает строки до GROUP BY, <code>HAVING</code> — после.</p>
+        <div class="code-block">
+          <pre>SELECT user_id,
+       count(*)   AS orders_total,
+       sum(total) AS revenue
+FROM   orders
+WHERE  created_at &gt;= now() - interval '90 days'   -- до агрегации
+GROUP  BY user_id
+HAVING count(*) &gt; 5                                -- после агрегации
+   AND sum(total) &gt; 10000
+ORDER  BY revenue DESC;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="having">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>В <code>HAVING</code> разрешены агрегаты, в <code>WHERE</code> — нет. Если условие можно записать без агрегата — пиши его в <code>WHERE</code>: дешевле и часто использует индекс.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="distinct">
+        <h3>DISTINCT и DISTINCT ON</h3>
+        <p class="summary">Убирает дубли по всем столбцам или по подмножеству — Postgres-специфика.</p>
+        <div class="code-block">
+          <pre>-- DISTINCT: уникальные комбинации всех выбранных столбцов:
+SELECT DISTINCT country FROM customers;
+SELECT DISTINCT country, gender FROM customers;
+
+-- DISTINCT ON: первая строка для каждого user_id по порядку:
+SELECT DISTINCT ON (user_id)
+       user_id, id, created_at, total
+FROM   orders
+ORDER  BY user_id, created_at DESC;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="distinct">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>DISTINCT ON (...)</code> требует, чтобы <code>ORDER BY</code> начинался с тех же столбцов. Часто <code>DISTINCT</code> в коде — это «костыль» поверх неправильного <code>JOIN</code>; перед тем как добавить, проверь, нет ли лишнего соединения.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="grouping-sets">
+        <h3>GROUPING SETS, ROLLUP, CUBE</h3>
+        <p class="summary">Несколько уровней группировки в одном запросе.</p>
+        <div class="code-block">
+          <pre>-- ROLLUP — иерархия с подытогами:
+SELECT country, city, count(*) AS n
+FROM   customers
+GROUP  BY ROLLUP (country, city)
+ORDER  BY country NULLS LAST, city NULLS LAST;
+
+-- CUBE — все возможные комбинации:
+SELECT country, gender, count(*) AS n
+FROM   customers
+GROUP  BY CUBE (country, gender);
+
+-- GROUPING SETS — точный список:
+SELECT country, gender, count(*) AS n
+FROM   customers
+GROUP  BY GROUPING SETS ((country), (gender), ());</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="grouping-sets">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Строки с подытогами отличаются <code>NULL</code> в столбце группировки. Для надёжного отличения «настоящего» NULL от «итог по этому столбцу» используют функцию <code>grouping(col)</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Подзапросы</h2>
+
+      <article class="topic" id="subqueries">
+        <h3>Скалярные, табличные, коррелированные</h3>
+        <p class="summary">Три формы — три разных смысла.</p>
+        <div class="code-block">
+          <pre>-- 1. Скалярный (один столбец, одна строка):
+SELECT u.id,
+       u.email,
+       (SELECT count(*) FROM orders o WHERE o.user_id = u.id) AS orders_total
+FROM   users u;
+
+-- 2. Табличный (в FROM):
+SELECT *
+FROM   (
+  SELECT user_id, count(*) AS c
+  FROM   orders
+  GROUP  BY user_id
+) t
+WHERE  t.c &gt; 10;
+
+-- 3. С ANY / ALL:
+SELECT *
+FROM   products
+WHERE  price &gt; ALL (SELECT price FROM products WHERE category = 'budget');
+
+-- 4. EXISTS (см. также semi-join на странице соединений):
+SELECT * FROM users u
+WHERE  EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="subqueries">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Скалярный подзапрос обязан возвращать ровно одну строку и один столбец. Если запрос становится тяжёлым — часто его лучше переписать через <code>JOIN</code> или <code>WITH</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. UNION, EXCEPT, INTERSECT</h2>
+
+      <article class="topic" id="set-ops">
+        <h3>Операции над множествами</h3>
+        <p class="summary">Объединение, вычитание и пересечение результатов запросов.</p>
+        <div class="code-block">
+          <pre>-- объединение, без дублей (дороже — внутри сортировка):
+SELECT id FROM new_users
+UNION
+SELECT id FROM trial_users;
+
+-- объединение, с дублями (быстрее, по умолчанию выбирай это):
+SELECT id FROM new_users
+UNION ALL
+SELECT id FROM trial_users;
+
+-- разница: пользователи активные, но не платящие:
+SELECT id FROM active_users
+EXCEPT
+SELECT id FROM paying_users;
+
+-- пересечение:
+SELECT id FROM active_users
+INTERSECT
+SELECT id FROM paying_users;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="set-ops">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Количество и типы столбцов должны совпадать. <code>ORDER BY</code> ставится в самом конце — он сортирует объединённый результат, а не отдельные части.</p>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

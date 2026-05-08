@@ -240,6 +240,31 @@ h1.page-title {
 .topic .desc p { margin: 0 0 var(--space-2); }
 .topic .desc ul { margin: var(--space-1) 0 var(--space-2) 20px; padding: 0; }
 .topic .desc li { margin: 2px 0; }
+.topic.concept {
+  border-left: 3px solid var(--accent);
+}
+.topic.concept .ai-only {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.topic .compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13.5px;
+}
+.topic .compare-table th, .topic .compare-table td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.topic .compare-table th {
+  background: var(--bg-elev);
+  font-weight: 600;
+  color: var(--text);
+}
 .topic .desc code {
   background: var(--bg-code);
   border: 1px solid var(--border);

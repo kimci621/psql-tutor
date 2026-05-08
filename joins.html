@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Соединения таблиц — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Соединения</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Соединения таблиц (JOIN)</h1>
+    <p class="page-lead">
+      Все типы JOIN-ов по отдельности, плюс полу- и анти-соединения через EXISTS,
+      многотабличные запросы и проектирование связей 1:N, N:M, 1:1.
+    </p>
+
+    <section class="category">
+      <h2>1. Базовые JOIN-ы</h2>
+
+      <article class="topic" id="inner-join">
+        <h3>INNER JOIN</h3>
+        <p class="summary">Только строки, у которых есть совпадение в обеих таблицах.</p>
+        <div class="code-block">
+          <pre>SELECT u.email, o.id, o.total
+FROM   users  u
+JOIN   orders o ON o.user_id = u.id
+WHERE  u.is_active;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="inner-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Слово <code>INNER</code> можно опустить — <code>JOIN</code> по умолчанию означает именно его.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="left-right-join">
+        <h3>LEFT и RIGHT OUTER JOIN</h3>
+        <p class="summary">Сохраняет все строки из «опорной» таблицы, даже без совпадения.</p>
+        <div class="code-block">
+          <pre>-- LEFT: все пользователи, у части — заказы:
+SELECT u.email, o.id
+FROM   users  u
+LEFT JOIN orders o ON o.user_id = u.id;
+
+-- частая ошибка: условие ушло в WHERE — превратилось в INNER:
+SELECT u.email, o.id
+FROM   users  u
+LEFT JOIN orders o ON o.user_id = u.id
+WHERE  o.total &gt; 0;          -- LEFT теперь как INNER
+
+-- правильно — внутри ON:
+SELECT u.email, o.id
+FROM   users  u
+LEFT JOIN orders o
+       ON o.user_id = u.id AND o.total &gt; 0;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="left-right-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="full-outer-join">
+        <h3>FULL OUTER JOIN</h3>
+        <p class="summary">Все строки из обеих таблиц; NULL там, где совпадения нет.</p>
+        <div class="code-block">
+          <pre>-- сверка двух источников:
+SELECT a.id AS a_id, b.id AS b_id, a.amount, b.amount
+FROM   ledger_a a
+FULL JOIN ledger_b b ON a.tx_id = b.tx_id
+WHERE  a.id IS NULL OR b.id IS NULL;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="full-outer-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Главный сценарий — найти расхождения между двумя версиями данных.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="cross-join">
+        <h3>CROSS JOIN</h3>
+        <p class="summary">Декартово произведение: каждая строка с каждой.</p>
+        <div class="code-block">
+          <pre>-- все комбинации размер × цвет:
+SELECT s.id AS size_id, c.id AS color_id
+FROM   sizes s
+CROSS JOIN colors c;
+
+-- генерим календарь × категории:
+SELECT d::date, cat
+FROM   generate_series('2026-01-01'::date, '2026-12-31', '1 day') d
+CROSS JOIN unnest(ARRAY['food','tech','books']) AS cat;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cross-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="self-join">
+        <h3>SELF JOIN</h3>
+        <p class="summary">Соединение таблицы с самой собой через два разных алиаса.</p>
+        <div class="code-block">
+          <pre>-- сотрудник + его руководитель:
+SELECT e.id, e.name AS employee, m.name AS manager
+FROM   employees e
+LEFT JOIN employees m ON m.id = e.manager_id;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="self-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Для глубоких иерархий лучше <a href="index.html#recursive-cte">WITH RECURSIVE</a>.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="natural-join">
+        <h3>NATURAL JOIN</h3>
+        <p class="summary">Автоматически соединяет по столбцам с одинаковыми именами.</p>
+        <div class="code-block">
+          <pre>-- если в обеих таблицах есть user_id и created_at,
+-- NATURAL JOIN неявно использует ОБА столбца:
+SELECT * FROM orders NATURAL JOIN payments;
+
+-- Лучше писать явно:
+SELECT * FROM orders JOIN payments USING (order_id);
+-- или
+SELECT * FROM orders o JOIN payments p ON p.order_id = o.id;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="natural-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>NATURAL JOIN</code> ломается, как только в любой из таблиц появится новый столбец с тем же именем (например, <code>created_at</code>). В реальном коде его обычно не используют.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. Полу- и анти-соединения</h2>
+
+      <article class="topic" id="semi-join">
+        <h3>SEMI JOIN: EXISTS / IN</h3>
+        <p class="summary">«У этой строки есть совпадение» — без возврата столбцов второй таблицы и без дублей.</p>
+        <div class="code-block">
+          <pre>-- EXISTS — обычно лучший выбор:
+SELECT u.*
+FROM   users u
+WHERE  EXISTS (
+  SELECT 1 FROM orders o WHERE o.user_id = u.id
+);
+
+-- IN с подзапросом — тот же смысл, но осторожнее с NULL:
+SELECT * FROM users
+WHERE  id IN (SELECT user_id FROM orders);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="semi-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>В отличие от обычного <code>JOIN</code>, semi-join не дублирует пользователя, у которого 10 заказов.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="anti-join">
+        <h3>ANTI JOIN: NOT EXISTS / LEFT JOIN ... IS NULL</h3>
+        <p class="summary">Строки без совпадения. Два идиоматичных способа.</p>
+        <div class="code-block">
+          <pre>-- предпочтительно:
+SELECT u.*
+FROM   users u
+WHERE  NOT EXISTS (
+  SELECT 1 FROM orders o WHERE o.user_id = u.id
+);
+
+-- альтернатива:
+SELECT u.*
+FROM   users u
+LEFT JOIN orders o ON o.user_id = u.id
+WHERE  o.id IS NULL;
+
+-- НЕ ИСПОЛЬЗУЙ:
+SELECT * FROM users
+WHERE  id NOT IN (SELECT user_id FROM orders);  -- ловушка с NULL</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="anti-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Если в подзапросе встретится хотя бы один <code>NULL</code>, <code>NOT IN</code> вернёт пустой результат — и это будет «логически корректно», но почти всегда не то, что ожидал автор.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Многотабличные запросы и связи</h2>
+
+      <article class="topic" id="multi-table-join">
+        <h3>Соединение более двух таблиц</h3>
+        <p class="summary">Цепочки JOIN-ов, читаемое форматирование.</p>
+        <div class="code-block">
+          <pre>SELECT u.email,
+       o.id           AS order_id,
+       o.created_at,
+       p.name         AS product,
+       oi.qty,
+       oi.qty * p.price AS line_total
+FROM   users        u
+JOIN   orders       o  ON o.user_id    = u.id
+JOIN   order_items  oi ON oi.order_id  = o.id
+JOIN   products     p  ON p.id         = oi.product_id
+WHERE  u.is_active
+  AND  o.created_at &gt;= now() - interval '30 days'
+ORDER  BY o.created_at DESC;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="multi-table-join">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="rel-one-to-many">
+        <h3>Связь 1:N (один ко многим)</h3>
+        <p class="summary">FK в «дочерней» таблице. Не забывай индекс на FK-столбце.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE users (
+  id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email text UNIQUE NOT NULL
+);
+
+CREATE TABLE orders (
+  id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  total   numeric(12,2) NOT NULL CHECK (total &gt;= 0)
+);
+
+CREATE INDEX idx_orders_user ON orders (user_id);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="rel-one-to-many">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="rel-many-to-many">
+        <h3>Связь N:M (многие ко многим)</h3>
+        <p class="summary">Через junction-таблицу с двумя FK и составным PK.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE posts (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY);
+CREATE TABLE tags  (
+  id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name text UNIQUE NOT NULL
+);
+
+CREATE TABLE post_tags (
+  post_id bigint NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  tag_id  bigint NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
+  PRIMARY KEY (post_id, tag_id)
+);
+
+-- PK даёт индекс по post_id; для поиска «посты с тегом» нужен второй:
+CREATE INDEX idx_post_tags_tag ON post_tags (tag_id);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="rel-many-to-many">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="rel-one-to-one">
+        <h3>Связь 1:1 (один к одному)</h3>
+        <p class="summary">Общий PK — самый чистый способ.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE users (
+  id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email text UNIQUE NOT NULL
+);
+
+CREATE TABLE user_profile (
+  user_id  bigint PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  bio      text,
+  birthday date
+);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="rel-one-to-one">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Если профиль есть всегда — поля можно держать прямо в <code>users</code>. 1:1 оправдан, когда «вторая» сущность редкая или сильно отличается по жизненному циклу (например, удаляется отдельно).</p>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

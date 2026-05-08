@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Индексы — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Индексы</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Индексы: глубокое погружение</h1>
+    <p class="page-lead">
+      Составные индексы и leftmost prefix, уникальные и частичные, индексы по выражению,
+      покрывающие (INCLUDE), типы индексов, селективность и проблема списка покупок.
+    </p>
+
+    <section class="category">
+      <h2>1. Составные и уникальные</h2>
+
+      <article class="topic" id="composite-index">
+        <h3>Составные индексы (несколько колонок)</h3>
+        <p class="summary">Один индекс по нескольким столбцам и правило <em>leftmost prefix</em>.</p>
+        <div class="code-block">
+          <pre>CREATE INDEX idx_orders_user_created
+  ON orders (user_id, created_at DESC);
+
+-- использует индекс:
+SELECT * FROM orders WHERE user_id = 1;
+SELECT * FROM orders WHERE user_id = 1 AND created_at &gt;= now() - interval '7 days';
+SELECT * FROM orders WHERE user_id = 1
+  ORDER BY created_at DESC LIMIT 20;
+
+-- НЕ использует (нет лидирующего столбца):
+SELECT * FROM orders WHERE created_at &gt;= now() - interval '7 days';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="composite-index">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Эмпирическое правило: сначала столбцы под равенство, потом — под диапазон/сортировку. <code>DESC</code> в индексе — для совпадения с <code>ORDER BY</code>.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="unique-index">
+        <h3>Индекс на уникальность</h3>
+        <p class="summary">UNIQUE-ограничение и UNIQUE-индекс — две стороны одного.</p>
+        <div class="code-block">
+          <pre>-- через ограничение (рекомендуется для именованной целостности):
+ALTER TABLE users ADD CONSTRAINT users_email_uq UNIQUE (email);
+
+-- через индекс — то же самое физически, но без имени constraint;
+-- зато можно по выражению:
+CREATE UNIQUE INDEX idx_users_email_lower ON users (lower(email));
+
+-- частичный UNIQUE — уникальность только для подмножества:
+CREATE UNIQUE INDEX idx_users_email_active
+  ON users (email) WHERE deleted_at IS NULL;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="unique-index">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>В UNIQUE по стандарту SQL <em>несколько NULL допустимы</em>. <code>ON CONFLICT (col)</code> работает только если по этим столбцам есть UNIQUE/PK.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. Селективность</h2>
+
+      <article class="topic" id="selectivity">
+        <h3>Селективность и почему планировщик выбирает Seq Scan</h3>
+        <p class="summary">Селективность — доля строк, которые удовлетворяют предикату.</p>
+        <div class="code-block">
+          <pre>-- Селективность ~ 1/N, индекс точно лучше:
+SELECT * FROM users WHERE id = 42;
+
+-- Селективность 50%, Seq Scan дешевле — индекс не поможет:
+SELECT * FROM users WHERE is_active;
+
+-- посмотреть, что планировщик знает про столбец:
+SELECT attname, n_distinct, null_frac, most_common_vals, most_common_freqs
+FROM   pg_stats
+WHERE  schemaname = 'public' AND tablename = 'users';
+
+-- сравнить ожидание и факт:
+EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM orders WHERE status = 'pending';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="selectivity">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Низкоселективные предикаты лечатся <strong>частичным индексом</strong> (только для нужного значения) или включением другого, более селективного, столбца в составной.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. По выражению и покрывающие</h2>
+
+      <article class="topic" id="expression-index">
+        <h3>Индекс по выражению</h3>
+        <p class="summary">Индексируем результат функции, а не сам столбец.</p>
+        <div class="code-block">
+          <pre>CREATE INDEX idx_users_email_lower ON users (lower(email));
+
+-- использует индекс:
+SELECT * FROM users WHERE lower(email) = lower($1);
+
+-- НЕ использует — выражение в WHERE другое:
+SELECT * FROM users WHERE email = $1;
+
+-- современная альтернатива — generated column:
+ALTER TABLE users
+  ADD COLUMN email_norm text GENERATED ALWAYS AS (lower(email)) STORED;
+CREATE INDEX idx_users_email_norm ON users (email_norm);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="expression-index">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Функция в индексе должна быть <code>IMMUTABLE</code>. Выражение в <code>WHERE</code> должно совпадать с выражением в индексе побайтово.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="covering-index">
+        <h3>Покрывающие индексы (INCLUDE)</h3>
+        <p class="summary">INCLUDE добавляет столбцы в индекс без участия в ключе — открывает Index-Only Scan.</p>
+        <div class="code-block">
+          <pre>CREATE INDEX idx_orders_user_created_inc
+  ON orders (user_id, created_at DESC)
+  INCLUDE (total, status);
+
+-- запрос полностью отвечает индексом, без чтения таблицы:
+EXPLAIN
+SELECT total, status
+FROM   orders
+WHERE  user_id = 1
+  AND  created_at &gt;= now() - interval '30 days';
+-- ожидаемый узел: Index Only Scan</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="covering-index">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Index-Only Scan возможен только когда страница помечена «всё-видима» в visibility map — за этим следит <code>VACUUM</code>. Слишком много INCLUDE-столбцов раздувает индекс и убивает выгоду.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Типы индексов</h2>
+
+      <article class="topic" id="index-types">
+        <h3>B-tree, GIN, GiST, SP-GiST, BRIN, Hash</h3>
+        <p class="summary">Каждый тип под свой класс операторов и данных.</p>
+        <div class="code-block">
+          <pre>-- B-tree (по умолчанию): равенство, диапазоны, сортировка
+CREATE INDEX idx_orders_user ON orders (user_id);
+
+-- GIN: jsonb, массивы, полнотекстовый поиск
+CREATE INDEX idx_docs_data ON docs USING gin (data);
+CREATE INDEX idx_docs_data_path ON docs USING gin (data jsonb_path_ops);
+
+-- GiST: геометрия, диапазоны, FTS, k-NN
+CREATE INDEX idx_events_tsr ON events USING gist (tsrange);
+
+-- SP-GiST: разреженные пространственные структуры
+CREATE INDEX idx_phones_prefix
+  ON phones USING spgist (number text_pattern_ops);
+
+-- BRIN: огромные таблицы с естественным порядком (time-series)
+CREATE INDEX idx_events_time_brin ON events USING brin (created_at);
+
+-- Hash: только равенство, иногда полезен на UUID/токенах
+CREATE INDEX idx_sessions_token ON sessions USING hash (token);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="index-types">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr><th>Тип</th><th>Когда брать</th><th>Что не умеет</th></tr></thead>
+            <tbody>
+              <tr><td>B-tree</td><td>почти всегда — равенство, диапазоны, ORDER BY</td><td>jsonb-поиск, полнотекстовый поиск</td></tr>
+              <tr><td>GIN</td><td>jsonb, массивы, FTS</td><td>дороже на запись</td></tr>
+              <tr><td>GiST</td><td>геометрия, диапазоны, FTS</td><td>не уникален без exclusion</td></tr>
+              <tr><td>BRIN</td><td>сотни ГБ, физический порядок</td><td>точечный поиск медленный</td></tr>
+              <tr><td>Hash</td><td>равенство по большому ключу</td><td>не сортирует</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Статистика и N+1</h2>
+
+      <article class="topic" id="stats-extended">
+        <h3>Расширенная статистика</h3>
+        <p class="summary"><code>CREATE STATISTICS</code> для коррелирующих столбцов.</p>
+        <div class="code-block">
+          <pre>-- Классический случай: country и city зависимы.
+-- Без extended stats планировщик считает их независимыми
+-- и сильно недооценивает количество строк.
+
+CREATE STATISTICS idx_geo (dependencies, ndistinct)
+  ON country, city
+  FROM customers;
+
+ANALYZE customers;
+
+SELECT stxname, stxkind FROM pg_statistic_ext;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="stats-extended">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="shopping-list-problem">
+        <h3>Проблема списка покупок (N+1)</h3>
+        <p class="summary">Один цикл по 1000 пользователей — 1000 запросов в БД.</p>
+        <div class="code-block">
+          <pre># Плохо: цикл превращается в N+1 запросов
+for user in users:
+    orders[user] = db.query("SELECT * FROM orders WHERE user_id = %s", user.id)
+
+-- Хорошо: один SQL с IN или JOIN:
+SELECT user_id, json_agg(o.* ORDER BY created_at DESC) AS orders
+FROM   orders o
+WHERE  user_id = ANY ($1::bigint[])
+GROUP  BY user_id;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="shopping-list-problem">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Включай SQL-логирование в dev-окружении — N+1 видно сразу. На стороне приложения помогают dataloader-паттерны и батчевое чтение по списку id.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Связанные темы</h2>
+      <article class="topic concept">
+        <h3>Где ещё про индексы</h3>
+        <div class="desc">
+          <ul>
+            <li><a href="index.html#create-index-btree">B-tree CREATE INDEX</a> — на главной.</li>
+            <li><a href="index.html#partial-index">Частичные индексы</a> — на главной.</li>
+            <li><a href="index.html#gin-index">GIN для jsonb и массивов</a> — на главной.</li>
+            <li><a href="guides/create-index.html">Гайд: создание индекса</a> — пошагово.</li>
+            <li><a href="senior.html#sr-pg-stat-statements">pg_stat_statements</a> — поиск тяжёлых запросов.</li>
+            <li><a href="senior.html#sr-fulltext">Полнотекстовый поиск</a> — про tsvector + GIN.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

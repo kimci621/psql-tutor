@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Программирование внутри PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Программирование</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">PL/pgSQL, функции, процедуры и триггеры</h1>
+    <p class="page-lead">
+      Серверная логика на стороне Postgres: процедурный язык, отличие функций от процедур,
+      триггеры. Главный совет — оставайся в чистом SQL, пока возможно; PL/pgSQL берут там,
+      где без процедурного потока не обойтись.
+    </p>
+
+    <section class="category">
+      <h2>1. PL/pgSQL</h2>
+
+      <article class="topic" id="plpgsql">
+        <h3>Основы PL/pgSQL</h3>
+        <p class="summary">Переменные, IF/LOOP, исключения. Всё внутри блоков <code>BEGIN…END</code>.</p>
+        <div class="code-block">
+          <pre>CREATE OR REPLACE FUNCTION grant_bonus(uid bigint, amount numeric)
+RETURNS numeric
+LANGUAGE plpgsql AS $$
+DECLARE
+  new_balance numeric;
+BEGIN
+  UPDATE accounts
+  SET    balance = balance + amount
+  WHERE  user_id = uid
+  RETURNING balance INTO new_balance;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'нет аккаунта user_id=%', uid;
+  END IF;
+
+  RETURN new_balance;
+
+EXCEPTION
+  WHEN check_violation THEN
+    RAISE NOTICE 'нарушено ограничение для user_id=%', uid;
+    RETURN NULL;
+END;
+$$;
+
+SELECT grant_bonus(42, 500);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="plpgsql">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><strong>Главное правило:</strong> где можно остаться в чистом SQL — оставайся. PL/pgSQL не оптимизируется так агрессивно, как обычный SQL, и сложнее в тестировании. <code>BEGIN…END</code> в PL/pgSQL — это блок кода, не транзакция; для управления транзакцией нужна процедура.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. Функции и процедуры</h2>
+
+      <article class="topic" id="functions-procedures">
+        <h3>FUNCTION vs PROCEDURE</h3>
+        <p class="summary">Функция возвращает значение и работает в одной транзакции; процедура может управлять транзакцией.</p>
+        <div class="code-block">
+          <pre>-- Функция (LANGUAGE sql, простая):
+CREATE OR REPLACE FUNCTION user_orders_count(uid bigint)
+RETURNS bigint
+LANGUAGE sql AS $$
+  SELECT count(*) FROM orders WHERE user_id = uid;
+$$;
+
+SELECT user_orders_count(42);
+
+-- Процедура (PG 11+, с COMMIT внутри):
+CREATE OR REPLACE PROCEDURE archive_old_orders(days_old int)
+LANGUAGE plpgsql AS $$
+DECLARE
+  rows_deleted int;
+BEGIN
+  LOOP
+    DELETE FROM orders
+    WHERE  ctid IN (
+      SELECT ctid FROM orders
+      WHERE  created_at &lt; now() - (days_old || ' days')::interval
+      LIMIT  1000
+    );
+    GET DIAGNOSTICS rows_deleted = ROW_COUNT;
+    EXIT WHEN rows_deleted = 0;
+    COMMIT;                       -- разрешено в PROCEDURE
+  END LOOP;
+END;
+$$;
+
+CALL archive_old_orders(365);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="functions-procedures">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Функцию вызывают через <code>SELECT</code>, процедуру — через <code>CALL</code>. <code>COMMIT/ROLLBACK</code> внутри функции запрещены: функция всегда работает в рамках вызывающей транзакции. Процедура поэтому полезна для долгих фоновых задач (архивация, перенос), которые надо коммитить пачками.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Триггеры</h2>
+
+      <article class="topic" id="triggers">
+        <h3>Триггеры на BEFORE/AFTER INSERT/UPDATE/DELETE</h3>
+        <p class="summary">Триггер вызывает функцию-триггер; функция возвращает запись (<code>NEW</code>) или <code>NULL</code>.</p>
+        <div class="code-block">
+          <pre>CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW
+WHEN (OLD.* IS DISTINCT FROM NEW.*)
+EXECUTE FUNCTION set_updated_at();
+
+-- STATEMENT-триггер для аудита:
+CREATE OR REPLACE FUNCTION audit_orders_change()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO audit_log (table_name, op, who, ts)
+  VALUES ('orders', TG_OP, current_user, now());
+  RETURN NULL;     -- для AFTER STATEMENT можно NULL
+END;
+$$;
+
+CREATE TRIGGER trg_orders_audit
+AFTER INSERT OR UPDATE OR DELETE ON orders
+FOR EACH STATEMENT
+EXECUTE FUNCTION audit_orders_change();</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="triggers">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>BEFORE</code>-триггер видит и может менять <code>NEW</code>; <code>AFTER</code> — выполняется уже после записи. <code>FOR EACH ROW</code> срабатывает на каждую строку, <code>FOR EACH STATEMENT</code> — раз на запрос.</p>
+          <p><strong>Минусы:</strong> триггеры — невидимая магия. Через год коллега не поймёт, почему «само что-то меняется». Современные альтернативы — <code>GENERATED ALWAYS AS … STORED</code>-столбцы, явная логика в коде приложения, или <code>RULE</code>-системы для специфичных случаев.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Связанные темы</h2>
+      <article class="topic concept">
+        <h3>Где ещё</h3>
+        <div class="desc">
+          <ul>
+            <li><a href="senior.html#sr-security-definer">SECURITY DEFINER</a> — безопасные привилегированные функции.</li>
+            <li><a href="senior.html#sr-rls">Row-Level Security</a> — политики доступа на уровне строк.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

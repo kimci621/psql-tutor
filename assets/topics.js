@@ -1329,4 +1329,1074 @@ export const topics = {
       "знать REASSIGN OWNED / DROP OWNED"
     ]
   },
+
+  // ===== Итерация 1: Основы, установка, типы =====
+
+  // --- basics.html ---
+  "why-dbms": {
+    title: "Зачем нам СУБД",
+    summary: "Чем СУБД отличается от файлов и почему это удобнее, чем «хранить всё в JSON».",
+    examples: [],
+    pitfalls: [
+      "Файлы не дают конкурентного доступа без блокировок",
+      "Самописное хранилище сложно сделать ACID-надёжным",
+      "Поиск без индекса = чтение всего файла"
+    ],
+    learningGoals: [
+      "перечислять задачи, которые решает СУБД",
+      "понимать разницу между файлом, key-value и реляционной БД"
+    ]
+  },
+  "dbms-cluster-db": {
+    title: "СУБД, база данных, кластер",
+    summary: "Различай: процесс СУБД, кластер (один сервер с несколькими БД), отдельная БД и подключение.",
+    examples: [
+      "psql -h localhost -U postgres   -- подключение к кластеру\n\\l                              -- список баз внутри кластера\n\\c mydb                         -- переключение в БД"
+    ],
+    pitfalls: [
+      "Один сервер postgres = один кластер, в нём может быть много БД",
+      "Каждая БД — отдельное пространство таблиц, ролей и прав",
+      "Параметры postgresql.conf и pg_hba.conf — общие на весь кластер"
+    ],
+    learningGoals: [
+      "правильно использовать слова «кластер» и «БД»",
+      "видеть границы между уровнями"
+    ]
+  },
+  "about-postgres": {
+    title: "О PostgreSQL",
+    summary: "Что такое Postgres: лицензия, история, чем он отличается от MySQL и Oracle.",
+    examples: [],
+    pitfalls: [
+      "PostgreSQL ≠ Postgres Pro: последний — отдельный коммерческий форк",
+      "MVCC и расширяемость типов — два главных архитектурных козыря"
+    ],
+    learningGoals: [
+      "понимать позицию Postgres среди других СУБД",
+      "знать, под какой лицензией он распространяется"
+    ]
+  },
+  "terminology": {
+    title: "Термины: настоящие и сленговые",
+    summary: "tuple/row, relation/table, attribute/column, predicate, query plan, MVCC.",
+    examples: [],
+    pitfalls: [
+      "В академической литературе «relation» — это таблица; в обиходе — связь между ними",
+      "tuple ≈ row, но tuple включает «версию строки» в MVCC"
+    ],
+    learningGoals: [
+      "не теряться в чужой документации",
+      "уверенно читать сообщения и логи Postgres"
+    ]
+  },
+  "sql-categories": {
+    title: "DDL, DML, DCL, TCL",
+    summary: "Категории SQL-команд: схема (DDL), данные (DML), права (DCL), транзакции (TCL).",
+    examples: [
+      "-- DDL: структура\nCREATE TABLE t (id int);\n\n-- DML: данные\nINSERT INTO t VALUES (1);\nSELECT * FROM t;\n\n-- DCL: права\nGRANT SELECT ON t TO readonly;\n\n-- TCL: транзакции\nBEGIN; UPDATE t SET id = 2; COMMIT;"
+    ],
+    pitfalls: [
+      "DDL в Postgres транзакционен — можно откатить ROLLBACK",
+      "TRUNCATE формально DDL, но влияет на данные"
+    ],
+    learningGoals: [
+      "по виду запроса понимать его категорию",
+      "ориентироваться в правах по категориям"
+    ]
+  },
+  "keys-pk-fk": {
+    title: "Первичный и внешний ключи",
+    summary: "PRIMARY KEY однозначно идентифицирует строку, FOREIGN KEY гарантирует ссылочную целостность.",
+    examples: [
+      "CREATE TABLE users (\n  id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  email text UNIQUE NOT NULL\n);\n\nCREATE TABLE orders (\n  id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE\n);"
+    ],
+    pitfalls: [
+      "PK неявно создаёт UNIQUE-индекс и NOT NULL",
+      "FK не строит индекс на ссылающемся столбце — это надо делать руками",
+      "Композитный PK допустим, но усложняет JOIN-ы"
+    ],
+    learningGoals: [
+      "проектировать ключи под бизнес-смысл",
+      "знать, как FK взаимодействует с DELETE/UPDATE"
+    ]
+  },
+  "select-sources": {
+    title: "Откуда ещё можно SELECT",
+    summary: "VALUES, generate_series, set-returning функции, CTE, подзапросы.",
+    examples: [
+      "SELECT * FROM (VALUES (1,'a'),(2,'b')) AS v(id, name);\n\nSELECT generate_series(1, 5) AS n;\n\nSELECT * FROM regexp_split_to_table('a,b,c', ',') AS t(part);"
+    ],
+    pitfalls: [
+      "VALUES без AS обычно невидим в столбцах — нужно дать псевдоним",
+      "generate_series удобен для синтетических данных и календарей"
+    ],
+    learningGoals: [
+      "генерировать данные в запросе без таблицы",
+      "знать про set-returning функции"
+    ]
+  },
+  "boolean-logic": {
+    title: "Булева алгебра в SQL",
+    summary: "AND/OR/NOT, операторы сравнения и трёхзначная логика с NULL.",
+    examples: [
+      "SELECT TRUE AND NULL;   -- NULL\nSELECT TRUE OR  NULL;   -- TRUE\nSELECT FALSE AND NULL;  -- FALSE\nSELECT NULL = NULL;     -- NULL"
+    ],
+    pitfalls: [
+      "В SQL логика трёхзначная: TRUE / FALSE / NULL",
+      "WHERE отбирает только TRUE — строки с NULL предикатом отбрасываются",
+      "NOT IN с NULL внутри списка возвращает NULL → строка не попадёт"
+    ],
+    learningGoals: [
+      "интуитивно работать с NULL в условиях",
+      "не наступать на грабли NOT IN"
+    ]
+  },
+  "null-coalesce": {
+    title: "NULL и coalesce",
+    summary: "NULL означает «неизвестно». coalesce/nullif — основные инструменты для борьбы с ним.",
+    examples: [
+      "SELECT coalesce(nickname, full_name, 'аноним') FROM users;\n\nSELECT a / NULLIF(b, 0) FROM t;\n\nSELECT * FROM users WHERE deleted_at IS NULL;"
+    ],
+    pitfalls: [
+      "coalesce возвращает первый не-NULL аргумент",
+      "NULLIF(x, y) → NULL, если x = y; иначе x",
+      "agg-функции (sum, avg) игнорируют NULL; count(col) тоже"
+    ],
+    learningGoals: [
+      "уверенно обрабатывать NULL",
+      "выбирать coalesce vs CASE"
+    ]
+  },
+  "order-by": {
+    title: "Сортировка: ORDER BY",
+    summary: "ASC/DESC, NULLS FIRST/LAST, сортировка по нескольким столбцам и выражениям.",
+    examples: [
+      "SELECT * FROM users\nORDER BY created_at DESC NULLS LAST, id;\n\nSELECT * FROM events\nORDER BY (data->>'priority')::int DESC, ts;"
+    ],
+    pitfalls: [
+      "NULL по умолчанию идёт «больше» при ASC и «меньше» при DESC",
+      "Сортировка по выражению — это работа на каждой строке; индекс на выражении спасает",
+      "Сортировка большой выборки требует work_mem"
+    ],
+    learningGoals: [
+      "управлять позицией NULL",
+      "связывать ORDER BY и план запроса"
+    ]
+  },
+  "sql-declarative": {
+    title: "SQL — декларативный язык",
+    summary: "Ты описываешь «что» получить, а не «как». «Как» решает планировщик.",
+    examples: [],
+    pitfalls: [
+      "Один и тот же результат можно записать многими способами — план будет разным",
+      "Подсказки планировщику в Postgres ограничены — рычаги через индексы и статистику"
+    ],
+    learningGoals: [
+      "перестать думать «императивно» при чтении SQL",
+      "доверять планировщику, но проверять"
+    ]
+  },
+  "sql-comments": {
+    title: "Комментарии в SQL и БД",
+    summary: "Однострочные --, многострочные /* */, и постоянные через COMMENT ON.",
+    examples: [
+      "-- однострочный комментарий\n/* много-\n   строчный */\n\nCOMMENT ON TABLE users IS 'учётные записи';\nCOMMENT ON COLUMN users.email IS 'нормализованный e-mail';"
+    ],
+    pitfalls: [
+      "COMMENT ON хранится в системном каталоге — виден в \\d+",
+      "Комментарии не влияют на выполнение"
+    ],
+    learningGoals: [
+      "оставлять контекст в коде и в БД",
+      "находить описания через \\d+ и pg_description"
+    ]
+  },
+  "relational-vs-nosql": {
+    title: "Реляционные vs нереляционные СУБД",
+    summary: "Когда нужен Postgres, когда — Mongo/Redis/Cassandra. Что Postgres умеет из «нереляционного».",
+    examples: [],
+    pitfalls: [
+      "jsonb в Postgres часто закрывает 80% задач, для которых тянут отдельный документный store",
+      "Нереляционные СУБД жертвуют согласованностью ради масштаба"
+    ],
+    learningGoals: [
+      "выбирать инструмент под задачу",
+      "понимать trade-offs CAP/PACELC"
+    ]
+  },
+  "sequences": {
+    title: "Последовательности (SEQUENCE)",
+    summary: "Генератор уникальных чисел. Стоит за serial и identity.",
+    examples: [
+      "CREATE SEQUENCE order_no_seq START 1000;\nSELECT nextval('order_no_seq');\nSELECT currval('order_no_seq');\nALTER SEQUENCE order_no_seq RESTART WITH 1;"
+    ],
+    pitfalls: [
+      "nextval работает вне транзакции — отменённый ROLLBACK не возвращает номер",
+      "Шаги cache=N оптимизируют выдачу, но создают «дыры» в номерах",
+      "При pg_dump/restore нужно SETVAL после загрузки данных"
+    ],
+    learningGoals: [
+      "понимать, как работают serial и identity внутри",
+      "управлять последовательностями руками"
+    ]
+  },
+  "aliases": {
+    title: "Псевдонимы (aliases)",
+    summary: "AS для столбцов и таблиц. Делает запросы короче и читабельнее.",
+    examples: [
+      "SELECT u.id AS user_id, o.id AS order_id\nFROM users u\nJOIN orders o ON o.user_id = u.id;"
+    ],
+    pitfalls: [
+      "AS можно опускать, но для столбцов лучше писать явно",
+      "Псевдоним столбца не виден в WHERE/GROUP BY (он применяется позже логически), но виден в ORDER BY"
+    ],
+    learningGoals: [
+      "сокращать длинные запросы",
+      "помнить порядок логического выполнения SELECT"
+    ]
+  },
+  "cluster-anatomy": {
+    title: "Анатомия кластера",
+    summary: "Кластер → БД → схема → табличное пространство → файл → страница (8 КБ).",
+    examples: [
+      "SHOW data_directory;\nSELECT spcname, pg_tablespace_location(oid) FROM pg_tablespace;\nSELECT current_setting('block_size');"
+    ],
+    pitfalls: [
+      "Размер страницы 8 КБ — на этапе компиляции; обычно не меняется",
+      "TOAST — отдельный механизм для больших значений, прозрачен для пользователя"
+    ],
+    learningGoals: [
+      "представлять физическую раскладку данных",
+      "понимать, что такое страница и зачем"
+    ]
+  },
+
+  // --- install.html ---
+  "install-overview": {
+    title: "Варианты установки",
+    summary: "Пакетный менеджер ОС, Docker, бинарные сборки, исходники, managed-облако.",
+    examples: [],
+    pitfalls: [
+      "Версия из репозитория ОС часто отстаёт от актуальной",
+      "Для прода обычно используют официальный pgdg-репозиторий или managed-сервис"
+    ],
+    learningGoals: [
+      "выбирать способ установки под задачу",
+      "знать про pgdg-репозитории"
+    ]
+  },
+  "install-package": {
+    title: "Установка из пакетного менеджера (Linux)",
+    summary: "Через apt/dnf и официальный репозиторий PostgreSQL Global Development Group.",
+    examples: [
+      "# Ubuntu/Debian (pgdg):\nsudo install -d /usr/share/postgresql-common/pgdg\nsudo apt-get install -y curl ca-certificates\nsudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \\\n  https://www.postgresql.org/media/keys/ACCC4CF8.asc\nsudo sh -c 'echo \"deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main\" > /etc/apt/sources.list.d/pgdg.list'\nsudo apt-get update\nsudo apt-get install -y postgresql-16\n\nsudo systemctl status postgresql"
+    ],
+    pitfalls: [
+      "На macOS вместо apt — Homebrew (brew install postgresql@16)",
+      "Postgres стартует под пользователем postgres; psql -U postgres"
+    ],
+    learningGoals: [
+      "поднять локальный Postgres на чистой системе",
+      "управлять службой через systemctl"
+    ]
+  },
+  "install-docker": {
+    title: "Установка в Docker",
+    summary: "Один контейнер для разработки или быстрых тестов.",
+    examples: [
+      "docker run --name pg \\\n  -e POSTGRES_PASSWORD=secret \\\n  -e POSTGRES_DB=app \\\n  -p 5432:5432 \\\n  -v pg-data:/var/lib/postgresql/data \\\n  -d postgres:16\n\ndocker exec -it pg psql -U postgres -d app"
+    ],
+    pitfalls: [
+      "Без -v данные теряются при удалении контейнера",
+      "POSTGRES_PASSWORD обязателен; без него контейнер не стартует",
+      "В проде вместо чистого docker — Kubernetes/StackGres/Patroni"
+    ],
+    learningGoals: [
+      "поднять Postgres за минуту",
+      "сохранять данные между перезапусками"
+    ]
+  },
+  "install-source": {
+    title: "Сборка из исходников",
+    summary: "Когда нужны патчи, нестандартный --prefix или включение опций сборки.",
+    examples: [
+      "wget https://ftp.postgresql.org/pub/source/v16.0/postgresql-16.0.tar.gz\ntar xf postgresql-16.0.tar.gz\ncd postgresql-16.0\n./configure --prefix=/opt/pg16 --with-openssl --with-icu\nmake -j$(nproc)\nsudo make install\n\nsudo /opt/pg16/bin/initdb -D /opt/pg16/data\n/opt/pg16/bin/pg_ctl -D /opt/pg16/data -l logfile start"
+    ],
+    pitfalls: [
+      "Не забудь --with-openssl и --with-icu для современных требований",
+      "initdb создаёт каталог данных и системные таблицы",
+      "Этот путь оправдан только для разработчиков ядра/расширений"
+    ],
+    learningGoals: [
+      "понимать, что такое initdb",
+      "знать стандартные опции configure"
+    ]
+  },
+
+  // --- types.html ---
+  "types-why": {
+    title: "Зачем нужны типы данных",
+    summary: "Типы — контракт. Они защищают от мусора, ускоряют сравнения и экономят место.",
+    examples: [],
+    pitfalls: [
+      "Хранение чисел в text — частый антипаттерн",
+      "Типы влияют на план запроса и индексируемость"
+    ],
+    learningGoals: [
+      "видеть связь типов и корректности",
+      "не складывать всё в text"
+    ]
+  },
+  "types-numbers": {
+    title: "Числовые типы",
+    summary: "smallint / int / bigint, numeric (точная), real / double precision (плавающая).",
+    examples: [
+      "CREATE TABLE money_demo (\n  qty       integer,\n  price     numeric(12,2),     -- точно\n  weight_kg double precision    -- быстро, но с погрешностью\n);"
+    ],
+    pitfalls: [
+      "0.1 + 0.2 в double precision ≠ 0.3 — используй numeric для денег",
+      "numeric точен, но дороже по CPU и месту",
+      "Не путай smallserial/serial/bigserial с identity"
+    ],
+    learningGoals: [
+      "выбирать тип для денег и количеств",
+      "не использовать float там, где нужна точность"
+    ]
+  },
+  "types-strings": {
+    title: "Строковые типы",
+    summary: "text, varchar(n), char(n), bytea для бинарных данных.",
+    examples: [
+      "CREATE TABLE t (\n  comment text,\n  code    varchar(16),\n  raw     bytea\n);\n\nSELECT length(comment), char_length(comment) FROM t;\nSELECT lower(comment), upper(comment) FROM t;"
+    ],
+    pitfalls: [
+      "varchar(n) в Postgres не быстрее text — длина проверяется триггером",
+      "char(n) дополняет до длины пробелами — почти всегда не то, что нужно",
+      "bytea ≠ blob: для крупных файлов лучше внешнее хранилище"
+    ],
+    learningGoals: [
+      "по умолчанию использовать text",
+      "знать функции работы со строками"
+    ]
+  },
+  "types-enum": {
+    title: "Перечисления (ENUM)",
+    summary: "Строгий список допустимых значений на уровне типа.",
+    examples: [
+      "CREATE TYPE order_status AS ENUM ('new','paid','shipped','cancelled');\n\nCREATE TABLE orders (\n  id     bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  status order_status NOT NULL DEFAULT 'new'\n);\n\nALTER TYPE order_status ADD VALUE 'returned';"
+    ],
+    pitfalls: [
+      "Удалить значение ENUM нельзя — только пересоздать тип",
+      "Альтернатива: text + CHECK или отдельная таблица справочника",
+      "Сравнение ENUM идёт по порядку определения"
+    ],
+    learningGoals: [
+      "выбирать ENUM vs справочная таблица",
+      "понимать стоимость изменений ENUM"
+    ]
+  },
+  "types-boolean": {
+    title: "Тип boolean",
+    summary: "TRUE/FALSE/NULL и удобные литералы.",
+    examples: [
+      "CREATE TABLE flags (is_active boolean NOT NULL DEFAULT true);\nSELECT * FROM flags WHERE is_active;       -- так короче\nSELECT * FROM flags WHERE is_active = TRUE; -- эквивалентно"
+    ],
+    pitfalls: [
+      "Постгрес принимает 't','true','yes','1' и 'f','false','no','0' — но в коде лучше явные TRUE/FALSE",
+      "WHERE flag отбирает только TRUE; NULL отбрасывается"
+    ],
+    learningGoals: [
+      "писать условия без = TRUE",
+      "помнить про трёхзначную логику"
+    ]
+  },
+  "types-arrays": {
+    title: "Массивы",
+    summary: "Postgres-специфика: массив любой размерности из любого типа.",
+    examples: [
+      "CREATE TABLE posts (\n  id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  tags text[] NOT NULL DEFAULT '{}'\n);\n\nSELECT * FROM posts WHERE 'sql' = ANY (tags);\nSELECT * FROM posts WHERE tags @> ARRAY['sql','db'];\nSELECT unnest(tags) FROM posts;"
+    ],
+    pitfalls: [
+      "Массивы удобны, но плохо нормализуются — для большого списка нужна отдельная таблица",
+      "GIN-индекс на tags ускоряет поиск через @> и ANY",
+      "Индексы массива через []: tags[1] (1-based)"
+    ],
+    learningGoals: [
+      "выбирать массив vs отдельная таблица",
+      "пользоваться ANY/ALL/@>"
+    ]
+  },
+
+  // ===== Итерация 2: Соединения и агрегации =====
+
+  // --- joins.html ---
+  "inner-join": {
+    title: "INNER JOIN",
+    summary: "Возвращает строки, у которых есть совпадение в обеих таблицах.",
+    examples: [
+      "SELECT u.email, o.id\nFROM users u\nJOIN orders o ON o.user_id = u.id;"
+    ],
+    pitfalls: [
+      "Без условия ON получится CROSS JOIN — декартово произведение",
+      "Тип столбцов в ON должен совпадать, иначе будет implicit cast и потеря индекса"
+    ],
+    learningGoals: ["писать корректное условие ON", "понимать порядок выполнения"]
+  },
+  "left-right-join": {
+    title: "LEFT и RIGHT OUTER JOIN",
+    summary: "Сохраняет все строки из «опорной» таблицы, даже если совпадения нет.",
+    examples: [
+      "SELECT u.email, o.id\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id;"
+    ],
+    pitfalls: [
+      "Условие на правой таблице в WHERE превращает LEFT в INNER",
+      "RIGHT JOIN — зеркало LEFT; чаще пишут LEFT, поменяв порядок таблиц"
+    ],
+    learningGoals: [
+      "сохранять «осиротевшие» строки",
+      "не превращать LEFT в INNER случайно"
+    ]
+  },
+  "full-outer-join": {
+    title: "FULL OUTER JOIN",
+    summary: "Все строки из обеих таблиц; NULL там, где совпадения нет.",
+    examples: [
+      "SELECT a.id AS a_id, b.id AS b_id\nFROM a FULL JOIN b ON a.key = b.key;"
+    ],
+    pitfalls: [
+      "Часто избыточен — обычно нужен LEFT с другой стороны",
+      "Удобен для сверки двух версий данных"
+    ],
+    learningGoals: ["находить расхождения между таблицами"]
+  },
+  "cross-join": {
+    title: "CROSS JOIN",
+    summary: "Декартово произведение: каждая строка с каждой.",
+    examples: [
+      "SELECT s.id, c.code\nFROM sizes s CROSS JOIN colors c;",
+      "-- генерим календарь × категории:\nSELECT d, cat\nFROM generate_series('2026-01-01'::date, '2026-12-31', '1 day') d\nCROSS JOIN unnest(ARRAY['food','tech']) cat;"
+    ],
+    pitfalls: [
+      "На больших таблицах легко получить миллиарды строк",
+      "Без CROSS JOIN тот же эффект даёт запятая в FROM (устаревший стиль)"
+    ],
+    learningGoals: ["понимать, когда декартово произведение оправдано"]
+  },
+  "self-join": {
+    title: "SELF JOIN",
+    summary: "Соединение таблицы с самой собой через алиасы.",
+    examples: [
+      "-- иерархия сотрудников:\nSELECT e.name AS employee, m.name AS manager\nFROM employees e\nLEFT JOIN employees m ON m.id = e.manager_id;"
+    ],
+    pitfalls: [
+      "Без разных алиасов запрос не парсится",
+      "Для глубокой иерархии лучше WITH RECURSIVE"
+    ],
+    learningGoals: ["работать с самоссылающимися связями"]
+  },
+  "natural-join": {
+    title: "NATURAL JOIN",
+    summary: "Автоматически соединяет по столбцам с одинаковыми именами.",
+    examples: [
+      "SELECT * FROM orders NATURAL JOIN users;",
+      "-- эквивалентно: JOIN ... USING (общие_столбцы)"
+    ],
+    pitfalls: [
+      "Ломается при добавлении нового одноимённого столбца",
+      "В реальных проектах считают плохой практикой — пишут JOIN ... USING или ON явно"
+    ],
+    learningGoals: ["знать о существовании", "не использовать в прод-коде"]
+  },
+  "semi-join": {
+    title: "SEMI JOIN (EXISTS, IN)",
+    summary: "Фильтрует строки, у которых ЕСТЬ совпадение, не возвращая столбцы из второй таблицы.",
+    examples: [
+      "SELECT u.*\nFROM users u\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);",
+      "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders);"
+    ],
+    pitfalls: [
+      "EXISTS обычно эффективнее IN с подзапросом",
+      "В отличие от JOIN, не дублирует строки при нескольких совпадениях",
+      "IN с NULL внутри списка — частая ловушка"
+    ],
+    learningGoals: ["выбирать EXISTS vs JOIN vs IN", "избегать дублей"]
+  },
+  "anti-join": {
+    title: "ANTI JOIN (NOT EXISTS, LEFT JOIN ... IS NULL)",
+    summary: "Строки без совпадения. Два идиоматичных способа.",
+    examples: [
+      "-- 1. NOT EXISTS — обычно лучший выбор:\nSELECT u.*\nFROM users u\nWHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);",
+      "-- 2. LEFT JOIN + IS NULL:\nSELECT u.*\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nWHERE o.id IS NULL;"
+    ],
+    pitfalls: [
+      "NOT IN c подзапросом, возвращающим NULL → ничего не вернётся",
+      "NOT EXISTS корректно работает с NULL и обычно эффективнее"
+    ],
+    learningGoals: ["находить «осиротевших»", "не наступать на NOT IN с NULL"]
+  },
+  "multi-table-join": {
+    title: "Соединение более двух таблиц",
+    summary: "JOIN-цепочки: порядок и стиль форматирования.",
+    examples: [
+      "SELECT u.email, o.id, p.name, oi.qty\nFROM users u\nJOIN orders      o  ON o.user_id    = u.id\nJOIN order_items oi ON oi.order_id  = o.id\nJOIN products    p  ON p.id         = oi.product_id\nWHERE u.is_active\n  AND o.created_at > now() - interval '30 days';"
+    ],
+    pitfalls: [
+      "С тремя+ JOIN важнее всего читаемость — выравнивай условия",
+      "Планировщик сам выбирает порядок соединений; join_collapse_limit ограничивает поиск"
+    ],
+    learningGoals: ["писать читаемые многотабличные запросы"]
+  },
+  "rel-one-to-many": {
+    title: "Связь 1:N (один ко многим)",
+    summary: "Самая частая связь: у пользователя много заказов.",
+    examples: [
+      "CREATE TABLE users (\n  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY\n);\n\nCREATE TABLE orders (\n  id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE\n);\n\nCREATE INDEX idx_orders_user ON orders (user_id);"
+    ],
+    pitfalls: [
+      "Индекс на FK-столбце нужен почти всегда",
+      "ON DELETE CASCADE удобен, но опасен — продумывай до проектирования"
+    ],
+    learningGoals: ["проектировать FK правильно"]
+  },
+  "rel-many-to-many": {
+    title: "Связь N:M (многие ко многим)",
+    summary: "Через промежуточную таблицу с двумя FK.",
+    examples: [
+      "CREATE TABLE posts (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY);\nCREATE TABLE tags  (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, name text UNIQUE);\n\nCREATE TABLE post_tags (\n  post_id bigint NOT NULL REFERENCES posts(id) ON DELETE CASCADE,\n  tag_id  bigint NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,\n  PRIMARY KEY (post_id, tag_id)\n);\n\nCREATE INDEX idx_post_tags_tag ON post_tags (tag_id);"
+    ],
+    pitfalls: [
+      "PRIMARY KEY (a, b) уже строит индекс по первому столбцу — на второй индекс нужен отдельно",
+      "На промежуточной таблице иногда полезны дополнительные атрибуты (created_at, weight)"
+    ],
+    learningGoals: ["проектировать junction-таблицу"]
+  },
+  "rel-one-to-one": {
+    title: "Связь 1:1 (один к одному)",
+    summary: "Реализуется через UNIQUE на FK-столбце или общий PK.",
+    examples: [
+      "CREATE TABLE users (id bigint PRIMARY KEY);\n\nCREATE TABLE user_profile (\n  user_id  bigint PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,\n  bio      text,\n  birthday date\n);"
+    ],
+    pitfalls: [
+      "Если профиль есть всегда — его столбцы можно держать прямо в users",
+      "1:1 оправдан, когда «дочерняя» часть редкая или сильно отличается по жизненному циклу"
+    ],
+    learningGoals: ["видеть, когда 1:1 действительно нужен"]
+  },
+
+  // --- aggregates.html ---
+  "aggregates-funcs": {
+    title: "Агрегатные функции",
+    summary: "count, sum, avg, min, max, bool_and/or, string_agg, array_agg.",
+    examples: [
+      "SELECT count(*)            AS rows_total,\n       count(email)        AS with_email,\n       count(DISTINCT user_id) AS uniq_users,\n       sum(amount)         AS total,\n       avg(amount)         AS avg_amount,\n       min(created_at)     AS first,\n       max(created_at)     AS last,\n       string_agg(email, ', ' ORDER BY email) AS list,\n       array_agg(id ORDER BY id)              AS ids\nFROM   orders;"
+    ],
+    pitfalls: [
+      "count(*) считает строки, count(col) — не-NULL значения",
+      "string_agg/array_agg поддерживают ORDER BY внутри",
+      "FILTER (WHERE ...) — условные агрегаты без CASE"
+    ],
+    learningGoals: ["знать набор агрегатов", "пользоваться FILTER"]
+  },
+  "json-agg-vs-orm": {
+    title: "json_agg vs ORM (борьба с N+1)",
+    summary: "Один запрос с агрегацией в JSON часто заменяет N+1 на стороне приложения.",
+    examples: [
+      "SELECT u.id, u.email,\n       coalesce(\n         json_agg(\n           json_build_object('id', o.id, 'total', o.total)\n           ORDER BY o.created_at DESC\n         ) FILTER (WHERE o.id IS NOT NULL),\n         '[]'::json\n       ) AS orders\nFROM   users u\nLEFT JOIN orders o ON o.user_id = u.id\nGROUP  BY u.id, u.email;"
+    ],
+    pitfalls: [
+      "Без FILTER (WHERE o.id IS NOT NULL) при LEFT JOIN получишь массив с одним null",
+      "Огромные json_agg на серверной стороне могут есть память — следи за размером результата"
+    ],
+    learningGoals: ["лечить N+1 одним SQL", "выбирать json_agg vs jsonb_agg"]
+  },
+  "case-when": {
+    title: "CASE WHEN",
+    summary: "Условное выражение в SQL: «если X, то Y, иначе Z».",
+    examples: [
+      "SELECT id, total,\n       CASE\n         WHEN total = 0           THEN 'free'\n         WHEN total < 1000        THEN 'small'\n         WHEN total < 10000       THEN 'medium'\n         ELSE                          'big'\n       END AS bucket\nFROM   orders;",
+      "-- условный агрегат через CASE:\nSELECT count(*) FILTER (WHERE status = 'paid')   AS paid,\n       count(*) FILTER (WHERE status = 'cancel') AS cancelled\nFROM   orders;"
+    ],
+    pitfalls: [
+      "Без ELSE возвращается NULL для непокрытых случаев",
+      "FILTER (WHERE ...) обычно читабельнее CASE для условных агрегатов"
+    ],
+    learningGoals: ["писать читаемые ветвления в SELECT"]
+  },
+  "having": {
+    title: "HAVING — фильтр после агрегации",
+    summary: "WHERE фильтрует строки до GROUP BY, HAVING — после.",
+    examples: [
+      "SELECT user_id, count(*) AS orders_total\nFROM   orders\nWHERE  created_at >= now() - interval '30 days'   -- до агрегации\nGROUP  BY user_id\nHAVING count(*) > 5;                              -- после агрегации"
+    ],
+    pitfalls: [
+      "В HAVING можно использовать агрегаты, в WHERE — нельзя",
+      "Часто соблазн всё писать в HAVING — не стоит, WHERE дешевле"
+    ],
+    learningGoals: ["разделять фильтры до и после"]
+  },
+  "distinct": {
+    title: "DISTINCT и DISTINCT ON",
+    summary: "Убирает дубли по всем столбцам или по подмножеству.",
+    examples: [
+      "SELECT DISTINCT country FROM customers;\n\n-- DISTINCT ON: первая строка для каждой группы\nSELECT DISTINCT ON (user_id) user_id, id, created_at\nFROM   orders\nORDER  BY user_id, created_at DESC;"
+    ],
+    pitfalls: [
+      "DISTINCT — это сортировка/хэш, не бесплатно",
+      "DISTINCT ON требует ORDER BY, начинающегося с тех же столбцов",
+      "Часто DISTINCT прячет ошибку в JOIN-условии"
+    ],
+    learningGoals: ["выбирать DISTINCT vs GROUP BY", "знать DISTINCT ON"]
+  },
+  "grouping-sets": {
+    title: "GROUPING SETS, ROLLUP, CUBE",
+    summary: "Несколько уровней группировки в одном запросе.",
+    examples: [
+      "-- ROLLUP даёт промежуточные итоги:\nSELECT country, city, count(*)\nFROM   customers\nGROUP  BY ROLLUP (country, city);\n\n-- CUBE — все комбинации:\nSELECT country, gender, count(*)\nFROM   customers\nGROUP  BY CUBE (country, gender);\n\n-- GROUPING SETS — точный список:\nSELECT country, gender, count(*)\nFROM   customers\nGROUP  BY GROUPING SETS ((country), (gender), ());"
+    ],
+    pitfalls: [
+      "Строка-итог отличается NULL в столбце — используй grouping() для надёжного распознавания",
+      "Эквивалент UNION ALL по нескольким GROUP BY — но компактнее и быстрее"
+    ],
+    learningGoals: ["считать итоги и подытоги одним запросом"]
+  },
+  "subqueries": {
+    title: "Подзапросы",
+    summary: "Скалярные, табличные, коррелированные. IN, ANY/ALL, EXISTS.",
+    examples: [
+      "-- скалярный подзапрос:\nSELECT u.id, u.email,\n       (SELECT count(*) FROM orders o WHERE o.user_id = u.id) AS orders_total\nFROM   users u;\n\n-- табличный (FROM):\nSELECT *\nFROM   (SELECT user_id, count(*) c FROM orders GROUP BY user_id) t\nWHERE  t.c > 10;\n\n-- ANY/ALL:\nSELECT * FROM products\nWHERE  price > ALL (SELECT price FROM products WHERE category = 'budget');"
+    ],
+    pitfalls: [
+      "Скалярный подзапрос должен возвращать ровно одну строку и столбец",
+      "Коррелированные подзапросы выполняются для каждой внешней строки — иногда дороже JOIN-а",
+      "CTE нередко читабельнее, чем вложенные подзапросы"
+    ],
+    learningGoals: ["видеть три вида подзапросов", "выбирать между подзапросом, JOIN и CTE"]
+  },
+  "set-ops": {
+    title: "UNION, EXCEPT, INTERSECT",
+    summary: "Объединение, вычитание и пересечение результатов запросов.",
+    examples: [
+      "SELECT id FROM a UNION     SELECT id FROM b;\nSELECT id FROM a UNION ALL SELECT id FROM b;\nSELECT id FROM a EXCEPT    SELECT id FROM b;\nSELECT id FROM a INTERSECT SELECT id FROM b;"
+    ],
+    pitfalls: [
+      "UNION без ALL дороже — он сортирует и убирает дубли",
+      "Количество и типы столбцов должны совпадать",
+      "ORDER BY ставится в конце финального запроса"
+    ],
+    learningGoals: ["использовать UNION ALL по умолчанию", "знать EXCEPT/INTERSECT"]
+  },
+
+  // ===== Итерация 3: Транзакции и индексы =====
+
+  // --- transactions.html ---
+  "cte-materialized": {
+    title: "CTE: MATERIALIZED vs NOT MATERIALIZED",
+    summary: "С PG 12+ planner может встраивать CTE в запрос. Иногда это плохо — тогда нужен барьер.",
+    examples: [
+      "-- по умолчанию (PG 12+): CTE может быть встроен в основной запрос\nWITH heavy AS (\n  SELECT id, expensive_func(x) AS v FROM big\n)\nSELECT * FROM heavy WHERE v > 0;\n\n-- явно материализуем (выполняется один раз, результат во временной структуре):\nWITH heavy AS MATERIALIZED (\n  SELECT id, expensive_func(x) AS v FROM big\n)\nSELECT * FROM heavy WHERE v > 0;\n\n-- явно встраиваем — даже если ссылка единственная:\nWITH heavy AS NOT MATERIALIZED (...)"
+    ],
+    pitfalls: [
+      "До PG 12 CTE всегда были оптимизационным барьером",
+      "MATERIALIZED полезен, если внутри тяжёлая функция и ты не хочешь, чтобы её вычисляли несколько раз"
+    ],
+    learningGoals: [
+      "понимать, когда нужен MATERIALIZED",
+      "видеть в плане CTE Scan vs встроенный запрос"
+    ]
+  },
+  "acid": {
+    title: "ACID",
+    summary: "Atomicity, Consistency, Isolation, Durability — четыре гарантии транзакций.",
+    examples: [],
+    pitfalls: [
+      "C из ACID — это не «согласованность распределённой системы», а «не нарушаются ограничения БД»",
+      "Isolation в реальности — спектр уровней с разной строгостью",
+      "Durability работает, только если включён fsync — не отключай"
+    ],
+    learningGoals: [
+      "переводить каждую букву в практический смысл",
+      "не путать C с CAP-Consistency"
+    ]
+  },
+  "savepoints": {
+    title: "Savepoints — точки сохранения",
+    summary: "Частичный откат внутри транзакции.",
+    examples: [
+      "BEGIN;\n  INSERT INTO orders (...) VALUES (...);\n  SAVEPOINT before_items;\n  INSERT INTO order_items (...) VALUES (...);\n  -- если что-то пошло не так:\n  ROLLBACK TO SAVEPOINT before_items;\n  -- продолжаем работу:\n  INSERT INTO order_items (...) VALUES (...);\nCOMMIT;"
+    ],
+    pitfalls: [
+      "Savepoint живёт до COMMIT/ROLLBACK всей транзакции",
+      "Каждый savepoint — это subtransaction; в большом количестве они бьют по производительности",
+      "ORM-ы используют savepoints для вложенных транзакций"
+    ],
+    learningGoals: [
+      "делать частичный откат",
+      "не злоупотреблять — десятки тысяч savepoint в одной транзакции тормозят"
+    ]
+  },
+  "iso-read-uncommitted-committed": {
+    title: "READ UNCOMMITTED / READ COMMITTED",
+    summary: "В Postgres READ UNCOMMITTED работает как READ COMMITTED. Это уровень по умолчанию.",
+    examples: [
+      "BEGIN ISOLATION LEVEL READ COMMITTED;\nSELECT balance FROM accounts WHERE id = 1;  -- видит закоммиченные изменения\n-- ... другая транзакция COMMIT-ит ...\nSELECT balance FROM accounts WHERE id = 1;  -- может вернуть другое значение\nCOMMIT;"
+    ],
+    pitfalls: [
+      "В READ COMMITTED каждый запрос получает свой снимок — non-repeatable read возможен",
+      "В Postgres dirty read невозможен ни на одном уровне (даже READ UNCOMMITTED ведёт себя как READ COMMITTED)",
+      "Уровень по умолчанию — READ COMMITTED"
+    ],
+    learningGoals: [
+      "понимать non-repeatable read",
+      "осознанно выбирать уровень"
+    ]
+  },
+  "iso-repeatable-read": {
+    title: "REPEATABLE READ",
+    summary: "Снимок берётся один раз в начале транзакции и не меняется.",
+    examples: [
+      "BEGIN ISOLATION LEVEL REPEATABLE READ;\nSELECT balance FROM accounts WHERE id = 1;  -- например, 1000\n-- другая транзакция COMMIT-ит изменение\nSELECT balance FROM accounts WHERE id = 1;  -- всё ещё 1000\nCOMMIT;"
+    ],
+    pitfalls: [
+      "Защищает от non-repeatable read и phantom read внутри одного снимка",
+      "При параллельных модификациях возможна ошибка SQLSTATE 40001 — нужен retry",
+      "Не защищает от write skew (две транзакции читают одно и пишут разное — и обе коммитят)"
+    ],
+    learningGoals: [
+      "видеть «застывший» снимок данных",
+      "ловить и обрабатывать serialization_failure"
+    ]
+  },
+  "iso-serializable": {
+    title: "SERIALIZABLE",
+    summary: "Самый строгий уровень: эффект параллельных транзакций должен совпадать с каким-то их последовательным выполнением.",
+    examples: [
+      "BEGIN ISOLATION LEVEL SERIALIZABLE;\n-- запросы и обновления;\nCOMMIT;\n\n-- В клиенте — обработка SQLSTATE 40001:\n-- сделать backoff, повторить транзакцию"
+    ],
+    pitfalls: [
+      "Implementation в Postgres называется SSI (Serializable Snapshot Isolation)",
+      "Гарантирует корректность в обмен на retry: serialization_failure возможен у обеих сторон конфликта",
+      "Не любой набор запросов выгоден — для горячих счётчиков лучше явные блокировки"
+    ],
+    learningGoals: [
+      "получать «как будто последовательное» выполнение",
+      "правильно ретраить транзакции"
+    ]
+  },
+  "iso-summary": {
+    title: "Итог по уровням изоляции",
+    summary: "Сравнительная таблица аномалий и поведения в Postgres.",
+    examples: [],
+    pitfalls: [
+      "READ UNCOMMITTED в Postgres = READ COMMITTED",
+      "Phantom read в SQL-стандарте отделён от non-repeatable read; в Postgres REPEATABLE READ закрывает оба",
+      "SERIALIZABLE даёт write skew, REPEATABLE READ — нет"
+    ],
+    learningGoals: [
+      "выбирать уровень осознанно",
+      "знать, какие аномалии где возможны"
+    ]
+  },
+
+  // --- indexes.html ---
+  "composite-index": {
+    title: "Составные индексы (несколько колонок)",
+    summary: "Один индекс по нескольким столбцам и правило «leftmost prefix».",
+    examples: [
+      "CREATE INDEX idx_orders_user_created\n  ON orders (user_id, created_at DESC);\n\n-- использует индекс:\nSELECT * FROM orders WHERE user_id = 1;\nSELECT * FROM orders WHERE user_id = 1 AND created_at >= now() - interval '7 days';\n\n-- НЕ использует (нет лидирующего столбца):\nSELECT * FROM orders WHERE created_at >= now() - interval '7 days';"
+    ],
+    pitfalls: [
+      "Порядок столбцов в индексе — критичен",
+      "Чаще всего: сначала равенство, потом диапазон",
+      "DESC vs ASC влияет на ORDER BY — индекс должен совпадать с сортировкой запроса"
+    ],
+    learningGoals: ["проектировать индекс под конкретный запрос", "видеть use в EXPLAIN"]
+  },
+  "unique-index": {
+    title: "Индекс на уникальность",
+    summary: "UNIQUE-ограничение и UNIQUE-индекс — две стороны одного.",
+    examples: [
+      "-- через ограничение (рекомендуется):\nALTER TABLE users ADD CONSTRAINT users_email_uq UNIQUE (email);\n\n-- через индекс — то же самое физически, но без имени constraint:\nCREATE UNIQUE INDEX idx_users_email_lower ON users (lower(email));\n\n-- частичный уникальный индекс — уникальность только для подмножества:\nCREATE UNIQUE INDEX idx_users_email_active\n  ON users (email) WHERE deleted_at IS NULL;"
+    ],
+    pitfalls: [
+      "В UNIQUE несколько NULL допустимы по стандарту SQL",
+      "Уникальный индекс по выражению — единственный способ принудить «email без учёта регистра»",
+      "ON CONFLICT (col) ловит только UNIQUE/PK по этим столбцам"
+    ],
+    learningGoals: [
+      "выбирать UNIQUE constraint vs UNIQUE INDEX",
+      "пользоваться частичным UNIQUE"
+    ]
+  },
+  "selectivity": {
+    title: "Селективность",
+    summary: "Что такое селективность индекса и почему планировщик выбирает Seq Scan.",
+    examples: [
+      "-- селективность 1% — индекс точно нужен:\nSELECT * FROM users WHERE id = 42;\n\n-- селективность 50% — Seq Scan дешевле:\nSELECT * FROM users WHERE is_active;",
+      "-- посмотреть статистику:\nSELECT attname, n_distinct, most_common_vals\nFROM   pg_stats\nWHERE  schemaname = 'public' AND tablename = 'users';"
+    ],
+    pitfalls: [
+      "Низко селективные предикаты (TRUE/FALSE, 'active') почти не выигрывают от обычного индекса",
+      "Помогает частичный индекс или включение редкого столбца в составной",
+      "Планировщик опирается на pg_stats — старая статистика = плохой план"
+    ],
+    learningGoals: ["понимать связь селективности и плана", "не удивляться Seq Scan"]
+  },
+  "expression-index": {
+    title: "Индекс по выражению",
+    summary: "Индексируем не сам столбец, а функцию от него.",
+    examples: [
+      "CREATE INDEX idx_users_email_lower ON users (lower(email));\n\n-- использует индекс:\nSELECT * FROM users WHERE lower(email) = lower($1);\n\n-- НЕ использует (другое выражение):\nSELECT * FROM users WHERE email = $1;"
+    ],
+    pitfalls: [
+      "Выражение в WHERE должно совпадать с выражением в индексе побайтово",
+      "Функция должна быть IMMUTABLE",
+      "Generated column + индекс — современная альтернатива"
+    ],
+    learningGoals: ["ускорять регистронезависимый поиск", "поддерживать одинаковые выражения"]
+  },
+  "covering-index": {
+    title: "Покрывающие индексы (INCLUDE)",
+    summary: "INCLUDE добавляет столбцы в индекс без участия в ключе — Index-Only Scan становится возможным.",
+    examples: [
+      "CREATE INDEX idx_orders_user_created_inc\n  ON orders (user_id, created_at DESC)\n  INCLUDE (total, status);\n\n-- запрос целиком отвечает индексом, без чтения таблицы:\nSELECT total, status\nFROM   orders\nWHERE  user_id = 1\n  AND  created_at >= now() - interval '30 days';"
+    ],
+    pitfalls: [
+      "INCLUDE-столбцы не участвуют в сортировке и ключе — они просто хранятся в индексе",
+      "Index-Only Scan работает, только если visibility map говорит, что страница «всё-видима»",
+      "Слишком большие INCLUDE раздувают индекс — теряется смысл"
+    ],
+    learningGoals: ["добиваться Index-Only Scan", "выбирать INCLUDE-столбцы"]
+  },
+  "index-types": {
+    title: "Типы индексов: B-tree, GIN, GiST, SP-GiST, BRIN, Hash",
+    summary: "Каждый тип под свой класс операторов и данных.",
+    examples: [
+      "-- B-tree (по умолчанию): равенство, диапазоны, сортировка\nCREATE INDEX idx_orders_user ON orders (user_id);\n\n-- GIN: jsonb, массивы, FTS\nCREATE INDEX idx_docs_data ON docs USING gin (data);\n\n-- GiST: геометрия, диапазоны, FTS\nCREATE INDEX idx_events_tsr ON events USING gist (tsrange);\n\n-- SP-GiST: дерево пространственного разбиения\nCREATE INDEX idx_phones_prefix ON phones USING spgist (number text_pattern_ops);\n\n-- BRIN: огромные таблицы с естественным порядком (по времени)\nCREATE INDEX idx_events_time_brin ON events USING brin (created_at);\n\n-- Hash: только равенство, нишевый\nCREATE INDEX idx_sessions_token ON sessions USING hash (token);"
+    ],
+    pitfalls: [
+      "Hash в Postgres < 10 не журналировался — сейчас уже надёжен",
+      "BRIN полезен, когда строки физически упорядочены по индексируемому столбцу",
+      "GIN с jsonb_path_ops компактнее, но поддерживает только @>"
+    ],
+    learningGoals: ["выбирать тип под структуру данных", "знать про BRIN для time-series"]
+  },
+  "stats-extended": {
+    title: "Расширенная статистика",
+    summary: "CREATE STATISTICS — для коррелирующих столбцов.",
+    examples: [
+      "-- классический случай: country и city зависимы\nCREATE STATISTICS idx_geo (dependencies, ndistinct)\n  ON country, city FROM customers;\n\nANALYZE customers;\n\n-- посмотреть:\nSELECT stxname, stxkind FROM pg_statistic_ext;"
+    ],
+    pitfalls: [
+      "Без extended stats планировщик считает столбцы независимыми и сильно ошибается в оценках",
+      "Виды: ndistinct, dependencies, mcv (с PG 12)"
+    ],
+    learningGoals: ["лечить мисс-эстимейт на коррелирующих столбцах"]
+  },
+  "shopping-list-problem": {
+    title: "Проблема списка покупок (N+1)",
+    summary: "Классика: «для каждого пользователя получим его заказы» в цикле — десятки тысяч запросов.",
+    examples: [
+      "-- ПЛОХО: N+1\nfor user in users:\n    orders[user] = SELECT * FROM orders WHERE user_id = user.id;\n\n-- ХОРОШО: один запрос с агрегацией:\nSELECT user_id, json_agg(o.*) AS orders\nFROM   orders o\nWHERE  user_id = ANY ($1::bigint[])\nGROUP  BY user_id;"
+    ],
+    pitfalls: [
+      "Lazy-loading в ORM — главный источник N+1",
+      "Включай SQL-логирование в dev — увидишь проблему сразу",
+      "Альтернатива: dataloader / batch + IN (...)"
+    ],
+    learningGoals: ["распознавать N+1", "лечить через batch или агрегацию"]
+  },
+
+  // ===== Итерация 4: Масштабирование, программирование, тулинг =====
+
+  // --- scaling.html ---
+  "scaling-h-v": {
+    title: "Горизонтальное и вертикальное масштабирование",
+    summary: "Vertical: больше CPU/RAM/SSD одной машине. Horizontal: больше машин.",
+    examples: [],
+    pitfalls: [
+      "Postgres сам по себе — single-master; «горизонтально» — это реплики на чтение и шардирование",
+      "Вертикалка проще, но имеет физический потолок и стоит нелинейно дорого",
+      "Перед масштабированием — оптимизация запросов и индексов"
+    ],
+    learningGoals: ["видеть, какой путь оправдан в твоём сценарии"]
+  },
+  "sharding": {
+    title: "Шардирование",
+    summary: "Разбиение данных по ключу между несколькими БД/кластерами.",
+    examples: [
+      "-- application-level sharding по user_id:\n-- shard_id = user_id % N\n-- роутинг запросов делает приложение или прокси (Vitess-подобные)\n\n-- Citus (расширение Postgres):\nCREATE EXTENSION citus;\nSELECT create_distributed_table('orders', 'user_id');"
+    ],
+    pitfalls: [
+      "Cross-shard JOIN и транзакции дороги — проектируй ключ так, чтобы запросы укладывались в один шард",
+      "Решардинг — операция уровня недели/месяца, не бери шардирование без необходимости",
+      "Citus снимает много рутины, но это уже другой эксплуатационный режим"
+    ],
+    learningGoals: ["выбирать ключ шардирования", "понимать стоимость cross-shard запросов"]
+  },
+  "cap-theorem": {
+    title: "CAP / PACELC",
+    summary: "При сетевом сбое распределённая система выбирает между Consistency и Availability. PACELC — расширение для штатной работы.",
+    examples: [],
+    pitfalls: [
+      "Postgres-кластер с синхронной репликацией — CP при отказе реплики; асинхронной — CA для чтений на реплике с возможной устаревшей видимостью",
+      "C из CAP — не C из ACID. Это linearizability, не «целостность ограничений»",
+      "PACELC: даже без сбоев есть выбор Latency vs Consistency"
+    ],
+    learningGoals: ["переводить теорему в инженерные решения"]
+  },
+  "pk-choice": {
+    title: "Что использовать в качестве PRIMARY KEY",
+    summary: "bigint identity vs uuid v4 vs uuid v7 vs natural key.",
+    examples: [
+      "-- современный default — bigint identity:\nid bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY\n\n-- uuid v4 (случайный):\nid uuid PRIMARY KEY DEFAULT gen_random_uuid()\n\n-- uuid v7 (сортируемый по времени) через расширение или приложение:\n-- предпочтительно для распределённых систем"
+    ],
+    pitfalls: [
+      "uuid v4 убивает локальность B-tree — на больших таблицах ощутимо медленнее bigint",
+      "uuid v7 / ULID решают проблему за счёт временной части в начале",
+      "Natural key (email, slug) — нестабилен и неудобен для FK"
+    ],
+    learningGoals: ["осознанно выбирать тип PK", "понимать стоимость uuid v4"]
+  },
+  "uuid": {
+    title: "UUID в PostgreSQL",
+    summary: "Тип uuid и функция gen_random_uuid (с PG 13+ встроена).",
+    examples: [
+      "-- встроено с PG 13:\nSELECT gen_random_uuid();\n\n-- до PG 13 — через pgcrypto:\nCREATE EXTENSION IF NOT EXISTS pgcrypto;\n\nCREATE TABLE events (\n  id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  data jsonb\n);"
+    ],
+    pitfalls: [
+      "uuid v4 — случайный → плохая локальность вставок в B-tree",
+      "uuid v7 — упорядочен по времени, дружит с индексами; но в Postgres его пока нет «из коробки»",
+      "Размер uuid — 16 байт против 8 у bigint; индексы у uuid в полтора-два раза больше"
+    ],
+    learningGoals: ["знать различия v4/v7", "оценивать стоимость uuid в индексах"]
+  },
+  "uuid-short": {
+    title: "Сокращение UUID для UI",
+    summary: "Base58/Base64 представление в URL/идентификаторах вместо 36-символьного канона.",
+    examples: [
+      "-- 22 символа base64url вместо 36 символов классического UUID:\nSELECT replace(\n         replace(\n           encode(uuid_send(gen_random_uuid()), 'base64'),\n         '+','-'),\n       '/','_')\n  AS short_id;"
+    ],
+    pitfalls: [
+      "Помни про padding: base64 от 16 байт даёт 24 символа; обрезка двух '=' даёт 22",
+      "Base58 (без 0/O/I/l) удобнее для пользователей, но требует кода на стороне приложения"
+    ],
+    learningGoals: ["сокращать uuid для пользовательских URL"]
+  },
+  "oltp-olap": {
+    title: "OLTP и OLAP",
+    summary: "Транзакционные системы (много мелких операций) и аналитические (тяжёлые SELECT).",
+    examples: [],
+    pitfalls: [
+      "PostgreSQL — отличный OLTP; для тяжёлой аналитики чаще берут колоночные store-ы (ClickHouse, DuckDB) или специализированные хранилища",
+      "Часто ставят реплику Postgres под аналитические запросы, чтобы не мешать продовому OLTP",
+      "TimescaleDB — расширение Postgres для time-series, лежит между OLTP и OLAP"
+    ],
+    learningGoals: ["видеть, какой профиль нагрузки у твоего сервиса"]
+  },
+
+  // --- programming.html ---
+  "plpgsql": {
+    title: "Основы PL/pgSQL",
+    summary: "Процедурный язык внутри Postgres: переменные, IF/LOOP, исключения.",
+    examples: [
+      "CREATE OR REPLACE FUNCTION grant_bonus(uid bigint, amount numeric)\nRETURNS numeric\nLANGUAGE plpgsql AS $$\nDECLARE\n  new_balance numeric;\nBEGIN\n  UPDATE accounts SET balance = balance + amount\n  WHERE  user_id = uid\n  RETURNING balance INTO new_balance;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'нет аккаунта user_id=%', uid;\n  END IF;\n\n  RETURN new_balance;\nEXCEPTION WHEN check_violation THEN\n  RAISE NOTICE 'нарушено ограничение';\n  RETURN NULL;\nEND;\n$$;"
+    ],
+    pitfalls: [
+      "PL/pgSQL не оптимизируется так агрессивно, как чистый SQL — где можно, оставайся в SQL",
+      "BEGIN/END в PL/pgSQL — это блок кода, а не транзакция",
+      "RAISE NOTICE — для логов; RAISE EXCEPTION — прерывает с откатом"
+    ],
+    learningGoals: ["писать простые серверные процедуры", "не злоупотреблять PL/pgSQL"]
+  },
+  "functions-procedures": {
+    title: "Функции и процедуры",
+    summary: "FUNCTION возвращает значение и работает в одной транзакции; PROCEDURE может управлять транзакцией.",
+    examples: [
+      "-- функция:\nCREATE OR REPLACE FUNCTION user_orders_count(uid bigint)\nRETURNS bigint LANGUAGE sql AS $$\n  SELECT count(*) FROM orders WHERE user_id = uid;\n$$;\n\nSELECT user_orders_count(42);\n\n-- процедура:\nCREATE OR REPLACE PROCEDURE archive_old_orders(days_old int)\nLANGUAGE plpgsql AS $$\nBEGIN\n  DELETE FROM orders WHERE created_at < now() - (days_old || ' days')::interval;\n  COMMIT;                       -- разрешено в PROCEDURE\nEND;\n$$;\n\nCALL archive_old_orders(365);"
+    ],
+    pitfalls: [
+      "Procedure появилась в PG 11 и не вызывается через SELECT — только CALL",
+      "В PROCEDURE можно делать COMMIT/ROLLBACK; в FUNCTION — нельзя",
+      "Безопасные SECURITY DEFINER-функции требуют SET search_path"
+    ],
+    learningGoals: ["выбирать FUNCTION vs PROCEDURE", "знать, чем процедура отличается"]
+  },
+  "triggers": {
+    title: "Триггеры и правила",
+    summary: "Триггер вызывает функцию на BEFORE/AFTER INSERT/UPDATE/DELETE/TRUNCATE.",
+    examples: [
+      "CREATE OR REPLACE FUNCTION set_updated_at()\nRETURNS trigger LANGUAGE plpgsql AS $$\nBEGIN\n  NEW.updated_at := now();\n  RETURN NEW;\nEND;\n$$;\n\nCREATE TRIGGER trg_users_updated_at\nBEFORE UPDATE ON users\nFOR EACH ROW\nWHEN (OLD.* IS DISTINCT FROM NEW.*)\nEXECUTE FUNCTION set_updated_at();"
+    ],
+    pitfalls: [
+      "BEFORE-триггер видит NEW и может изменять его; AFTER — уже после записи",
+      "STATEMENT-триггеры срабатывают раз на запрос; ROW — на каждую строку",
+      "Триггеры — «магия»: тяжело отлаживать через год; в современных проектах часто заменяют логикой в приложении или generated columns"
+    ],
+    learningGoals: ["писать BEFORE UPDATE для updated_at", "знать про STATEMENT vs ROW"]
+  },
+
+  // --- tooling.html ---
+  "tools-overview": {
+    title: "Инструменты: psql, pgcli, DBeaver, PyCharm",
+    summary: "CLI и GUI клиенты для повседневной работы.",
+    examples: [
+      "psql -h 127.0.0.1 -U postgres -d app   # стандартный CLI\npip install pgcli && pgcli postgres://user:pass@host/db   # CLI с автодополнением\n# DBeaver — кросс-платформенный GUI, поддерживает все мажорные СУБД\n# PyCharm/IntelliJ — встроенный Database Tools, удобен внутри IDE"
+    ],
+    pitfalls: [
+      "psql установлен везде, где есть Postgres-клиент — самый портативный вариант",
+      "pgcli приятен в интерактиве, но в скриптах ничего не даёт",
+      "GUI хороши для просмотра, но крупные миграции лучше через psql + файлы"
+    ],
+    learningGoals: ["иметь под рукой 1–2 удобных клиента"]
+  },
+  "psql-tricks": {
+    title: "Хитрости psql и pgcli",
+    summary: "\\watch, \\edit, \\timing, \\gset, \\copy, \\set HISTSIZE.",
+    examples: [
+      "\\timing on                    -- показывать время выполнения\n\\watch 2                      -- повторять последний запрос каждые 2 сек\n\\edit                         -- открыть последний запрос в $EDITOR\n\\copy users TO 'users.csv' CSV HEADER\n\\copy users FROM 'users.csv' CSV HEADER\n\\set ECHO_HIDDEN on           -- показывать SQL за метакомандами\n\\gexec                        -- выполнить результат предыдущего SELECT как SQL\n\\set HISTSIZE 100000          -- увеличить историю команд"
+    ],
+    pitfalls: [
+      "\\copy идёт через клиент (быстрее всего из локального файла), COPY — через сервер",
+      "\\gexec — мощный, но опасный: один лишний пробел, и ты выполнил не то",
+      "\\watch не поддерживает SET — там обычная команда зацикленно повторяется"
+    ],
+    learningGoals: ["сократить рутину в psql", "знать про \\copy"]
+  },
+  "pgpass": {
+    title: ".pgpass — файл с паролями",
+    summary: "Безопаснее переменных окружения, не светится в ps.",
+    examples: [
+      "# ~/.pgpass\n# hostname:port:database:username:password\n127.0.0.1:5432:*:postgres:secret\nproduction-db.example.com:5432:app:app_user:abc123\n\n# Права обязательны:\nchmod 600 ~/.pgpass\n\n# Теперь можно без -W:\npsql -h 127.0.0.1 -U postgres -d app"
+    ],
+    pitfalls: [
+      "Без chmod 600 psql проигнорирует файл и не предупредит",
+      "* допустим в любом поле как wildcard",
+      "Альтернатива — переменные PGPASSWORD/PGUSER/PGDATABASE, но они видны в `ps -ef`"
+    ],
+    learningGoals: ["избавиться от ввода пароля каждый раз", "не светить пароли в process list"]
+  },
+  "db-sizes": {
+    title: "Размер БД, таблиц и индексов",
+    summary: "Функции pg_database_size, pg_total_relation_size, pg_size_pretty.",
+    examples: [
+      "-- по БД:\nSELECT datname, pg_size_pretty(pg_database_size(datname)) AS size\nFROM   pg_database\nORDER  BY pg_database_size(datname) DESC;\n\n-- топ-20 таблиц по полному размеру (heap+toast+индексы):\nSELECT n.nspname || '.' || c.relname AS rel,\n       pg_size_pretty(pg_total_relation_size(c.oid))   AS total,\n       pg_size_pretty(pg_relation_size(c.oid))         AS heap,\n       pg_size_pretty(pg_indexes_size(c.oid))          AS idx\nFROM   pg_class c\nJOIN   pg_namespace n ON n.oid = c.relnamespace\nWHERE  c.relkind = 'r'\n  AND  n.nspname NOT IN ('pg_catalog','information_schema')\nORDER  BY pg_total_relation_size(c.oid) DESC\nLIMIT  20;"
+    ],
+    pitfalls: [
+      "pg_relation_size — только heap; pg_total_relation_size — heap + toast + индексы",
+      "Раздутый индекс — кандидат на REINDEX CONCURRENTLY",
+      "Размер БД не уменьшится после DELETE — нужен VACUUM (не FULL — он переписывает таблицу)"
+    ],
+    learningGoals: ["находить «толстые» таблицы и индексы"]
+  },
+  "sqlite-comparison": {
+    title: "SQLite vs PostgreSQL",
+    summary: "Когда хватит SQLite, а когда нужен Postgres.",
+    examples: [],
+    pitfalls: [
+      "SQLite — встраиваемая, файл на диске; писатель один за раз",
+      "Postgres — клиент-сервер, конкурентные writers, расширения, репликация",
+      "SQLite отлично подходит для мобильных приложений, локальных кешей, тестов; Postgres — для бэкенд-сервисов"
+    ],
+    learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
+  },
 };

@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Основы PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Основы</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Основы: что такое БД и как устроен Postgres</h1>
+    <p class="page-lead">
+      Раздел для тех, кто только подходит к базам данных или хочет навести порядок в терминах.
+      У концептуальных карточек нет блока кода — они изучаются только через диалог с ИИ-ментором.
+    </p>
+
+    <section class="category">
+      <h2>1. Что такое СУБД и зачем она</h2>
+      <p class="sub">Зачем нужен Postgres вообще, и чем он отличается от файлов и других СУБД.</p>
+
+      <article class="topic concept" id="why-dbms">
+        <h3>Зачем нам СУБД</h3>
+        <p class="summary">Файлы умеют хранить байты. СУБД умеет хранить связанные данные надёжно, конкурентно и быстро.</p>
+        <div class="desc">
+          <p>СУБД отвечает сразу за пять задач, которые ты иначе делал бы руками: транзакционность, ссылочную целостность, изолированный конкурентный доступ, индексированный поиск и язык запросов. Каждая из этих задач по отдельности — это месяцы работы.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="why-dbms">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+
+      <article class="topic concept" id="dbms-cluster-db">
+        <h3>СУБД, база данных, кластер</h3>
+        <p class="summary">Эти три слова часто путают. Запомни иерархию: процесс → кластер → база → подключение.</p>
+        <div class="desc">
+          <ul>
+            <li><strong>Процесс СУБД</strong> — программа <code>postgres</code>, запущенная на машине.</li>
+            <li><strong>Кластер</strong> — каталог данных и инстанс, в котором лежит несколько БД.</li>
+            <li><strong>База данных</strong> — изолированное пространство схем, таблиц, ролей, прав.</li>
+            <li><strong>Сессия</strong> — конкретное подключение клиента к одной БД.</li>
+          </ul>
+        </div>
+        <div class="code-block">
+          <pre>psql -h localhost -U postgres   -- подключение к кластеру
+\l                              -- список БД в кластере
+\c mydb                         -- переключиться в БД</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="dbms-cluster-db">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic concept" id="about-postgres">
+        <h3>О PostgreSQL</h3>
+        <p class="summary">Open-source СУБД с почти 40-летней историей. Лицензия PostgreSQL — близка к BSD, разрешает почти всё.</p>
+        <div class="desc">
+          <p>Главные архитектурные особенности: MVCC без блокировок чтений, расширяемые типы и индексы, развитая поддержка JSON, оконных функций и CTE. По функциональности часто опережает коммерческих конкурентов.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="about-postgres">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+
+      <article class="topic concept" id="terminology">
+        <h3>Термины: настоящие и сленговые</h3>
+        <p class="summary">tuple/row, relation/table, attribute/column, predicate, query plan — что значат эти слова.</p>
+        <div class="desc">
+          <p>В академических текстах и в документации Postgres ты встретишь оба варианта. Понимание словаря помогает читать pg_catalog, EXPLAIN и сообщения об ошибках без затыков.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="terminology">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. Категории команд SQL</h2>
+      <p class="sub">DDL, DML, DCL, TCL и зачем их различать.</p>
+
+      <article class="topic" id="sql-categories">
+        <h3>DDL, DML, DCL, TCL</h3>
+        <p class="summary">SQL делится на четыре категории по тому, что они делают.</p>
+        <div class="code-block">
+          <pre>-- DDL: структура
+CREATE TABLE t (id int);
+ALTER TABLE t ADD COLUMN name text;
+DROP TABLE t;
+
+-- DML: данные
+INSERT INTO t VALUES (1, 'a');
+SELECT * FROM t;
+UPDATE t SET name = 'b' WHERE id = 1;
+DELETE FROM t WHERE id = 1;
+
+-- DCL: права
+GRANT SELECT ON t TO readonly;
+REVOKE SELECT ON t FROM readonly;
+
+-- TCL: транзакции
+BEGIN;
+  UPDATE t SET name = 'c';
+COMMIT;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sql-categories">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Polezno: в Postgres DDL транзакционен — можно завернуть <code>CREATE TABLE</code> в <code>BEGIN…ROLLBACK</code> и откатить. В большинстве других СУБД это не работает.</p>
+        </div>
+      </article>
+
+      <article class="topic concept" id="sql-declarative">
+        <h3>SQL — декларативный язык</h3>
+        <p class="summary">Ты описываешь, какой результат нужен. Как именно — решает планировщик.</p>
+        <div class="desc">
+          <p>Это и сила (компилятор/оптимизатор может выбрать быстрый план), и ловушка (один и тот же запрос может работать по-разному в зависимости от статистики, индексов и версии). Поэтому EXPLAIN — рабочий инструмент, а не «продвинутая опция».</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="sql-declarative">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+
+      <article class="topic" id="sql-comments">
+        <h3>Комментарии в SQL и в БД</h3>
+        <p class="summary">Однострочные/многострочные в коде и постоянные через <code>COMMENT ON</code>.</p>
+        <div class="code-block">
+          <pre>-- однострочный
+/* много-
+   строчный */
+
+COMMENT ON TABLE  users        IS 'учётные записи';
+COMMENT ON COLUMN users.email  IS 'нормализованный e-mail (lowercase)';
+
+-- посмотреть в psql:
+\d+ users</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sql-comments">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Ключи и связи</h2>
+      <p class="sub">PRIMARY KEY и FOREIGN KEY — основа реляционной модели.</p>
+
+      <article class="topic" id="keys-pk-fk">
+        <h3>Первичный и внешний ключи</h3>
+        <p class="summary">PK однозначно идентифицирует строку, FK гарантирует ссылочную целостность.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE users (
+  id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email text UNIQUE NOT NULL
+);
+
+CREATE TABLE orders (
+  id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  total   numeric(12,2) NOT NULL CHECK (total &gt;= 0)
+);
+
+CREATE INDEX idx_orders_user_id ON orders (user_id);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="keys-pk-fk">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>FK не строит индекс на ссылающемся столбце автоматически. Без него каскадные удаления и JOIN будут медленными.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Базовые операции с данными</h2>
+      <p class="sub">SELECT, фильтрация, NULL, сортировка, алиасы.</p>
+
+      <article class="topic" id="select-sources">
+        <h3>Откуда ещё можно SELECT</h3>
+        <p class="summary">Не только таблицы: VALUES, generate_series, set-returning функции, подзапросы.</p>
+        <div class="code-block">
+          <pre>SELECT * FROM (VALUES (1,'a'),(2,'b')) AS v(id, name);
+
+SELECT generate_series('2026-01-01'::date,
+                       '2026-12-01'::date,
+                       interval '1 month') AS month;
+
+SELECT * FROM regexp_split_to_table('a,b,c', ',') AS t(part);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="select-sources">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic concept" id="boolean-logic">
+        <h3>Булева алгебра в SQL</h3>
+        <p class="summary">Логика трёхзначная: TRUE / FALSE / NULL. WHERE отбирает только TRUE.</p>
+        <div class="code-block">
+          <pre>SELECT TRUE  AND NULL;   -- NULL
+SELECT TRUE  OR  NULL;   -- TRUE
+SELECT FALSE AND NULL;   -- FALSE
+SELECT NULL = NULL;      -- NULL  (а не TRUE!)
+
+-- неприятный сюрприз:
+SELECT * FROM t WHERE x NOT IN (1, 2, NULL);   -- никогда ничего не вернёт</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="boolean-logic">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="null-coalesce">
+        <h3>NULL и coalesce</h3>
+        <p class="summary">NULL — «неизвестно». coalesce / NULLIF — основной инструмент работы с ним.</p>
+        <div class="code-block">
+          <pre>SELECT coalesce(nickname, full_name, 'аноним') AS display_name
+FROM   users;
+
+SELECT a / NULLIF(b, 0) AS ratio FROM t;
+
+SELECT count(*)        AS rows_total,
+       count(email)    AS with_email,
+       sum(amount)     AS total_amount   -- агрегаты игнорируют NULL
+FROM   orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="null-coalesce">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="order-by">
+        <h3>Сортировка: ORDER BY</h3>
+        <p class="summary">ASC/DESC, NULLS FIRST/LAST, по нескольким столбцам и выражениям.</p>
+        <div class="code-block">
+          <pre>SELECT id, email, deleted_at
+FROM   users
+ORDER  BY deleted_at DESC NULLS LAST,
+          email      ASC;
+
+SELECT *
+FROM   events
+ORDER  BY (data-&gt;&gt;'priority')::int DESC, ts;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="order-by">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>NULL по умолчанию идёт «больше» при ASC и «меньше» при DESC. Если нужно иначе — пиши <code>NULLS FIRST</code> или <code>NULLS LAST</code> явно.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="aliases">
+        <h3>Псевдонимы (aliases)</h3>
+        <p class="summary"><code>AS</code> для столбцов и таблиц делает запросы короче.</p>
+        <div class="code-block">
+          <pre>SELECT u.id     AS user_id,
+       u.email,
+       o.id     AS order_id,
+       o.total
+FROM   users  u
+JOIN   orders o ON o.user_id = u.id;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="aliases">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Псевдоним столбца виден в <code>ORDER BY</code>, но не в <code>WHERE/GROUP BY</code>: они логически вычисляются раньше, чем SELECT назначает имена.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Реляционные vs нереляционные</h2>
+
+      <article class="topic concept" id="relational-vs-nosql">
+        <h3>Реляционные vs нереляционные СУБД</h3>
+        <p class="summary">Когда брать Postgres, а когда — Mongo, Redis, Cassandra.</p>
+        <div class="desc">
+          <p>Реляционная СУБД даёт сильную согласованность, схему и язык запросов. Нереляционные жертвуют чем-то из этого ради скорости, гибкости схемы или горизонтального масштаба. Postgres сильно «отъедает» у документных хранилищ за счёт <code>jsonb</code> и расширений.</p>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="relational-vs-nosql">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Последовательности</h2>
+
+      <article class="topic" id="sequences">
+        <h3>SEQUENCE — генератор номеров</h3>
+        <p class="summary">Стоит за <code>serial</code> и <code>identity</code>. Иногда полезен сам по себе.</p>
+        <div class="code-block">
+          <pre>CREATE SEQUENCE order_no_seq START 1000 INCREMENT 1;
+
+SELECT nextval('order_no_seq');   -- получить следующее значение
+SELECT currval('order_no_seq');   -- последнее в этой сессии
+SELECT setval ('order_no_seq', 1000, false);  -- сбросить
+ALTER  SEQUENCE order_no_seq RESTART WITH 1;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sequences">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>nextval</code> работает вне транзакции — отменённый <code>ROLLBACK</code> не возвращает выданный номер. В номерах будут «дыры» — это нормально.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>7. Анатомия кластера</h2>
+
+      <article class="topic" id="cluster-anatomy">
+        <h3>Кластер → БД → схема → tablespace → файл → страница</h3>
+        <p class="summary">Физическая раскладка данных Postgres на диске.</p>
+        <div class="code-block">
+          <pre>SHOW data_directory;
+SELECT current_setting('block_size');   -- обычно 8192 (8 КБ)
+
+SELECT spcname, pg_tablespace_location(oid)
+FROM   pg_tablespace;
+
+-- Размер каждой БД:
+SELECT datname, pg_size_pretty(pg_database_size(datname))
+FROM   pg_database
+ORDER  BY pg_database_size(datname) DESC;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cluster-anatomy">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Страница (page) — единица чтения/записи. Большие значения автоматически уезжают в TOAST, но это прозрачно для пользователя.</p>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

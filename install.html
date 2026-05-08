@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Установка PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=3"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="index.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Установка</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Установка PostgreSQL</h1>
+    <p class="page-lead">
+      Четыре способа поднять Postgres: пакетный менеджер ОС (для прода и обычной разработки),
+      Docker (для одноразовых тестов и сред), сборка из исходников (для тех, кто пишет расширения),
+      managed-облако (когда не хочется заниматься эксплуатацией).
+    </p>
+
+    <section class="category">
+      <h2>1. Какой способ выбрать</h2>
+
+      <article class="topic concept" id="install-overview">
+        <h3>Варианты установки</h3>
+        <p class="summary">Сравнение четырёх путей: что проще, что надёжнее, что быстрее.</p>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr><th>Способ</th><th>Когда брать</th><th>Минусы</th></tr></thead>
+            <tbody>
+              <tr><td>Пакетный менеджер (apt/dnf/brew)</td><td>Локальная разработка, прод на bare-metal/VM</td><td>Версия из дистрибутива часто устарела — нужен pgdg-репозиторий</td></tr>
+              <tr><td>Docker</td><td>Быстрый старт, изолированные тесты, CI</td><td>В проде нужны Patroni/StackGres, не «голый» docker</td></tr>
+              <tr><td>Из исходников</td><td>Разработка ядра/расширений, нестандартные опции</td><td>Долго, требует разбора зависимостей</td></tr>
+              <tr><td>Managed (RDS/Yandex Cloud/Supabase)</td><td>Когда нет команды DBA</td><td>Дороже, ограничения по расширениям и доступу</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="install-overview">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. Через пакетный менеджер</h2>
+
+      <article class="topic" id="install-package">
+        <h3>Установка из пакетного менеджера</h3>
+        <p class="summary">Для Ubuntu/Debian — официальный pgdg-репозиторий. Версия всегда актуальная.</p>
+        <div class="code-block">
+          <pre># Ubuntu/Debian — pgdg-репозиторий:
+sudo install -d /usr/share/postgresql-common/pgdg
+sudo apt-get install -y curl ca-certificates lsb-release
+sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+  https://www.postgresql.org/media/keys/ACCC4CF8.asc
+sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+  &gt; /etc/apt/sources.list.d/pgdg.list'
+
+sudo apt-get update
+sudo apt-get install -y postgresql-16
+
+# Проверка:
+sudo systemctl status postgresql
+sudo -u postgres psql -c "SELECT version();"</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="install-package">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>На macOS — <code>brew install postgresql@16 &amp;&amp; brew services start postgresql@16</code>. На RHEL/Fedora — <code>dnf module enable postgresql:16 &amp;&amp; dnf install postgresql-server</code>, затем <code>postgresql-setup --initdb</code>.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. В контейнере</h2>
+
+      <article class="topic" id="install-docker">
+        <h3>Установка в Docker</h3>
+        <p class="summary">Один контейнер, том для данных, готово.</p>
+        <div class="code-block">
+          <pre>docker run --name pg \
+  -e POSTGRES_PASSWORD=secret \
+  -e POSTGRES_DB=app \
+  -e POSTGRES_USER=app \
+  -p 5432:5432 \
+  -v pg-data:/var/lib/postgresql/data \
+  -d postgres:16
+
+docker exec -it pg psql -U app -d app
+
+# С docker-compose это выглядит так:
+# services:
+#   db:
+#     image: postgres:16
+#     environment:
+#       POSTGRES_PASSWORD: secret
+#     volumes:
+#       - pg-data:/var/lib/postgresql/data
+#     ports: ["5432:5432"]
+# volumes: { pg-data: {} }</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="install-docker">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Без флага <code>-v</code> данные исчезнут при удалении контейнера. <code>POSTGRES_PASSWORD</code> обязателен — без него образ не стартует. Для прода один контейнер не годится: нужен Patroni / StackGres / managed-сервис.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Из исходников</h2>
+
+      <article class="topic" id="install-source">
+        <h3>Сборка PostgreSQL из исходников</h3>
+        <p class="summary">Когда нужны патчи, нестандартный <code>--prefix</code> или работа над ядром.</p>
+        <div class="code-block">
+          <pre>wget https://ftp.postgresql.org/pub/source/v16.0/postgresql-16.0.tar.gz
+tar xf postgresql-16.0.tar.gz
+cd postgresql-16.0
+
+./configure --prefix=/opt/pg16 \
+            --with-openssl \
+            --with-icu \
+            --with-libxml
+make -j"$(nproc)"
+sudo make install
+
+# Инициализация каталога данных:
+sudo mkdir -p /opt/pg16/data
+sudo chown $USER /opt/pg16/data
+/opt/pg16/bin/initdb -D /opt/pg16/data --locale=en_US.UTF-8 -E UTF8
+
+# Запуск:
+/opt/pg16/bin/pg_ctl -D /opt/pg16/data -l /opt/pg16/data/server.log start
+/opt/pg16/bin/psql -h /tmp -d postgres</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="install-source">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>initdb</code> создаёт системные каталоги и пустой кластер. Без <code>--with-openssl</code> не будет TLS, без <code>--with-icu</code> — современных коллаций. Для приклада ставь из пакетов; «исходники» — путь разработчика расширений.</p>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>
