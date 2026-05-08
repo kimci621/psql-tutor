@@ -17,7 +17,7 @@
 
 - [x] **0.1** Опечатки: `scaling.html:180` (`vt v4`→`UUID v4`), `scaling.html:221` (`movemen`), `tooling.html:45` («психологии»→«хитрости») — **S** — 2026-05-08, 3064617
 - [x] **0.2** Бамп `?v=` в тегах `<script>` после правок JS — **S** — 2026-05-08, c6ee598
-- [ ] **0.3** Прогон тестов: `node --test tests/*.mjs` + `for f in assets/*.js; do node --check "$f"; done` + `python3 -m unittest tests.server_proxy.test_proxy` — **S**
+- [x] **0.3** Прогон тестов: `node --test tests/*.mjs` + `for f in assets/*.js; do node --check "$f"; done` + `python3 -m unittest tests.server_proxy.test_proxy` — **S** — 2026-05-08, 393019e
 
 ### Фаза 1 (часть 1). Навигация
 
