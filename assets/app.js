@@ -1,5 +1,5 @@
 import { highlightSQL } from "./sql-highlight.js?v=2";
-import { initChat } from "./chat.js?v=4";
+import { initChat } from "./chat.js?v=5";
 import { loadTheme, saveTheme } from "./settings.js";
 import { findTrackContext, resolveHref } from "./tracks.js?v=1";
 
@@ -143,10 +143,10 @@ function injectChatPanel() {
       <div id="chatSub" class="topic-sub"></div>
     </div>
     <div class="chat-actions">
-      <button class="btn icon" id="openSettings" title="Настройки LLM">⚙</button>
-      <button class="btn icon" id="chatExport" title="Скачать диалог (.md)">⤓</button>
-      <button class="btn icon" id="chatReset" title="Сбросить диалог">↺</button>
-      <button class="btn icon" id="chatClose" title="Закрыть">✕</button>
+      <button class="btn icon" id="openSettings" title="Настройки LLM" aria-label="Настройки LLM"><span aria-hidden="true">⚙</span></button>
+      <button class="btn icon" id="chatExport" title="Скачать диалог (.md)" aria-label="Скачать диалог в формате Markdown"><span aria-hidden="true">⤓</span></button>
+      <button class="btn icon" id="chatReset" title="Сбросить диалог" aria-label="Сбросить диалог"><span aria-hidden="true">↺</span></button>
+      <button class="btn icon" id="chatClose" title="Закрыть" aria-label="Закрыть чат"><span aria-hidden="true">✕</span></button>
     </div>
   </div>
   <div id="chatBody" class="chat-body"></div>

@@ -37,21 +37,21 @@
   --bg: #f7f9fc;
   --bg-elev: #ffffff;
   --bg-card: #ffffff;
-  --bg-code: #f1f5f9;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --text: #0f172a;
-  --text-dim: #475569;
-  --text-muted: #64748b;
-  --accent: #0369a1;
-  --accent-dim: #075985;
-  --accent-soft: rgba(3, 105, 161, 0.1);
-  --kw: #c2410c;
-  --str: #15803d;
-  --num: #7c3aed;
-  --com: #94a3b8;
-  --fn: #0369a1;
-  --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --bg-code: #eef2f7;
+  --border: #d6dee8;
+  --border-strong: #b6c2d2;
+  --text: #0b1320;
+  --text-dim: #334155;
+  --text-muted: #475569;
+  --accent: #035388;
+  --accent-dim: #023e66;
+  --accent-soft: rgba(3, 83, 136, 0.14);
+  --kw: #9a3412;
+  --str: #166534;
+  --num: #6d28d9;
+  --com: #64748b;
+  --fn: #035388;
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
 }
 
 * { box-sizing: border-box; }

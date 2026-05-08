@@ -255,6 +255,14 @@ function initSettingsModal() {
   const tokensIn = document.getElementById("setTokens");
   const status = document.getElementById("settingsStatus");
 
+  let lastFocused = null;
+
+  function focusableIn(root) {
+    return Array.from(root.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(el => el.offsetParent !== null || el === document.activeElement);
+  }
+
   function open() {
     const s = loadSettings();
     baseUrlIn.value = s.baseUrl;
@@ -262,13 +270,43 @@ function initSettingsModal() {
     tempIn.value = s.temperature;
     tokensIn.value = s.maxTokens;
     status.textContent = "";
+    lastFocused = document.activeElement;
     modal.classList.add("open");
+    setTimeout(() => baseUrlIn.focus(), 50);
   }
-  function close() { modal.classList.remove("open"); }
+  function close() {
+    modal.classList.remove("open");
+    if (lastFocused && typeof lastFocused.focus === "function") {
+      lastFocused.focus();
+    }
+  }
 
   openBtn.addEventListener("click", open);
   cancelBtn.addEventListener("click", close);
   modal.addEventListener("click", e => { if (e.target === modal) close(); });
+
+  // Esc закрывает модалку настроек; Tab/Shift+Tab — ловушка фокуса.
+  modal.addEventListener("keydown", e => {
+    if (!modal.classList.contains("open")) return;
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      close();
+      return;
+    }
+    if (e.key === "Tab") {
+      const items = focusableIn(modal);
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
 
   saveBtn.addEventListener("click", () => {
     saveSettings({
