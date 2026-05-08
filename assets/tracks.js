@@ -13,7 +13,7 @@ export const tracks = [
       { href: 'install.html', title: 'Установка PostgreSQL' },
       { href: 'basics.html', title: 'Основы SQL и psql' },
       { href: 'types.html', title: 'Типы данных' },
-      { href: 'cheatsheet.html', title: 'Шпаргалка по командам' },
+      { href: 'cheatsheet.html', title: 'Шпаргалка по командам' }, // ранее index.html
       { href: 'joins.html', title: 'Соединения (JOIN)' },
       { href: 'aggregates.html', title: 'Агрегации и GROUP BY' },
       { href: 'guides/list-tables.html', title: 'Гайд: список таблиц' },

@@ -45,7 +45,8 @@ python3 server.py --port 8000
 
 ```
 psql-tutor/
-├── index.html              # Шпаргалка (20 категорий)
+├── index.html              # Лендинг с учебными треками (Junior/Middle/Senior)
+├── cheatsheet.html         # Шпаргалка (20 категорий)
 ├── errors.html             # Частые ошибки
 ├── guides/
 │   ├── list-tables.html
