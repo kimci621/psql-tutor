@@ -126,6 +126,58 @@ function initTrackNavigation() {
   main.appendChild(nav);
 }
 
+// Кнопка-якорь для каждой `.topic` с id: «копировать ссылку на тему».
+// Существующие id (например, data-topic-id) уже работают как якоря,
+// мы только подсвечиваем целевую тему и кладём в буфер обмена URL.
+function initTopicAnchors() {
+  const topics = document.querySelectorAll(".topic[id]");
+  topics.forEach(topic => {
+    const id = topic.id;
+    const h = topic.querySelector("h3");
+    if (!h || h.querySelector("a.anchor")) return;
+    const a = document.createElement("a");
+    a.href = "#" + id;
+    a.className = "anchor";
+    a.setAttribute("aria-label", "Скопировать ссылку на тему «" + h.textContent.trim() + "»");
+    a.title = "Скопировать ссылку на тему";
+    a.innerHTML = '<span aria-hidden="true">🔗</span>';
+    a.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const url = location.origin + location.pathname + "#" + id;
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        // fallback
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch {}
+        document.body.removeChild(ta);
+      }
+      history.replaceState(null, "", "#" + id);
+      const orig = a.innerHTML;
+      a.innerHTML = '<span aria-hidden="true">✓</span>';
+      setTimeout(() => { a.innerHTML = orig; }, 1200);
+    });
+    h.appendChild(document.createTextNode(" "));
+    h.appendChild(a);
+  });
+
+  // Подсветка темы, на которую перешли по якорю.
+  function highlightFromHash() {
+    const id = decodeURIComponent(location.hash.slice(1));
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (!el || !el.classList.contains("topic")) return;
+    document.querySelectorAll(".topic.anchor-target").forEach(t => t.classList.remove("anchor-target"));
+    el.classList.add("anchor-target");
+    setTimeout(() => el.classList.remove("anchor-target"), 2400);
+  }
+  highlightFromHash();
+  window.addEventListener("hashchange", highlightFromHash);
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -198,5 +250,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initCodeBlocks();
   initActiveNav();
   initTrackNavigation();
+  initTopicAnchors();
   initChat();
 });
