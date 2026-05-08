@@ -1,8 +1,8 @@
 import { topics } from "./topics.js";
-import { buildSystemPrompt, greetingUserMessage } from "./prompts.js";
+import { buildInitialUserMessage, buildSystemPrompt } from "./prompts.js?v=3";
 import { streamChat, listModels } from "./llm-client.js";
-import { loadSettings, saveSettings } from "./settings.js";
-import { renderMarkdown } from "./md.js";
+import { defaults, loadSettings, saveSettings } from "./settings.js";
+import { renderMarkdown } from "./md.js?v=2";
 
 const HISTORY_PREFIX = "psql-tutor:chat:";
 const state = {
@@ -39,6 +39,7 @@ export function initChat() {
   sendBtn.addEventListener("click", sendCurrent);
   stopBtn.addEventListener("click", stopStream);
   resetBtn.addEventListener("click", resetDialog);
+  document.getElementById("chatExport").addEventListener("click", exportDialog);
   taEl.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -68,8 +69,8 @@ function openChat(topicId) {
   setTimeout(() => taEl.focus(), 200);
 
   if (state.history.length === 0) {
-    // Первый запуск темы — попросим ИИ начать сократический диалог
-    sendMessage(greetingUserMessage, /*hidden*/ true);
+    // Первый запуск темы — попросим ИИ сначала объяснить выбранную тему.
+    sendMessage(buildInitialUserMessage(state.topic), /*hidden*/ true);
   }
 }
 
@@ -198,14 +199,47 @@ function stopStream() {
   }
 }
 
+function exportDialog() {
+  if (!state.topic) return;
+  const lines = [
+    `# ${state.topic.title}`,
+    "",
+    `_Экспорт диалога с ИИ-ментором · ${new Date().toLocaleString("ru-RU")}_`,
+    "",
+  ];
+  let hasContent = false;
+  for (const m of state.history) {
+    if (m.hidden) continue;
+    hasContent = true;
+    lines.push(m.role === "user" ? "## Я" : "## Ментор");
+    lines.push("");
+    lines.push(m.content);
+    lines.push("");
+  }
+  if (!hasContent) {
+    alert("В этом диалоге пока нет сообщений.");
+    return;
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+  a.download = `psql-${state.topicId}-${stamp}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function resetDialog() {
   if (!confirm("Сбросить диалог по этой теме?")) return;
   stopStream();
   state.history = [];
   saveHistory();
   bodyEl.innerHTML = "";
-  // снова попросим ИИ начать
-  sendMessage(greetingUserMessage, true);
+  // снова попросим ИИ сначала объяснить тему
+  sendMessage(buildInitialUserMessage(state.topic), true);
 }
 
 // ===== Settings modal =====
@@ -238,7 +272,7 @@ function initSettingsModal() {
 
   saveBtn.addEventListener("click", () => {
     saveSettings({
-      baseUrl: baseUrlIn.value.trim() || "http://localhost:1234/v1",
+      baseUrl: baseUrlIn.value.trim() || defaults.baseUrl,
       model: modelIn.value.trim(),
       temperature: parseFloat(tempIn.value) || 0.4,
       maxTokens: parseInt(tokensIn.value) || 1024,

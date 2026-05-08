@@ -1,5 +1,5 @@
-import { highlightSQL } from "./sql-highlight.js";
-import { initChat } from "./chat.js";
+import { highlightSQL } from "./sql-highlight.js?v=2";
+import { initChat } from "./chat.js?v=4";
 import { loadTheme, saveTheme } from "./settings.js";
 
 function applyTheme(t) {
@@ -72,6 +72,7 @@ function injectChatPanel() {
     </div>
     <div class="chat-actions">
       <button class="btn icon" id="openSettings" title="Настройки LLM">⚙</button>
+      <button class="btn icon" id="chatExport" title="Скачать диалог (.md)">⤓</button>
       <button class="btn icon" id="chatReset" title="Сбросить диалог">↺</button>
       <button class="btn icon" id="chatClose" title="Закрыть">✕</button>
     </div>
@@ -80,7 +81,7 @@ function injectChatPanel() {
   <div class="chat-foot">
     <textarea id="chatInput" placeholder="Напиши свою мысль или вопрос… (Enter — отправить, Shift+Enter — перенос)"></textarea>
     <div class="row">
-      <span class="hint">Ментор спрашивает, а не диктует — отвечай своими словами.</span>
+      <span class="hint">Ментор сначала объясняет тему, затем проверяет понимание.</span>
       <div style="display:flex; gap:6px;">
         <button class="btn" id="chatStop" style="display:none;">Стоп</button>
         <button class="btn primary" id="chatSend">Отправить</button>
@@ -92,9 +93,14 @@ function injectChatPanel() {
 <div id="settingsModal" class="modal" role="dialog" aria-modal="true">
   <div class="box">
     <h2>Настройки локального LLM</h2>
-    <small>По умолчанию — LM Studio. Включи в LM Studio: <em>Developer → Local Server → Start Server</em>.</small>
+    <small>
+      LM Studio: <em>Developer → Local Server → Start Server</em>.<br>
+      По умолчанию сайт ходит через same-origin proxy, чтобы браузер не упирался в CORS.<br>
+      • <code>/api/lmstudio/api/v1</code> — прокси к простому LM Studio API<br>
+      • <code>/api/lmstudio/v1</code> — прокси к OpenAI-совместимому API
+    </small>
     <label>Base URL</label>
-    <input id="setBaseUrl" type="text" placeholder="http://localhost:1234/v1">
+    <input id="setBaseUrl" type="text" placeholder="/api/lmstudio/api/v1">
     <label>Модель (id)</label>
     <input id="setModel" type="text" placeholder="оставь пустым для модели по умолчанию">
     <label>Temperature</label>
