@@ -47,6 +47,55 @@
       тему с примерами, затем проверяет понимание и помогает разобраться через вопросы.
     </p>
 
+    <section class="tracks-section" aria-labelledby="tracks-heading">
+      <h2 id="tracks-heading">Учебные треки</h2>
+      <p class="sub">Идти по теме за темой проще, чем перескакивать. Выбери трек по уровню — и страницы пойдут в осмысленном порядке.</p>
+      <div class="tracks">
+        <article class="track-card" aria-labelledby="track-junior">
+          <div class="track-meta"><span>Junior</span><span>Старт</span><span>1–2 недели</span></div>
+          <h3 id="track-junior">Junior с нуля</h3>
+          <p class="track-summary">Поставить PostgreSQL, разобраться с psql, написать первый CREATE TABLE и SELECT, понять JOIN и агрегации.</p>
+          <ol class="track-pages">
+            <li><a href="install.html">Установка PostgreSQL</a></li>
+            <li><a href="basics.html">Основы SQL и psql</a></li>
+            <li><a href="types.html">Типы данных</a></li>
+            <li><a href="index.html">Шпаргалка по командам</a></li>
+            <li><a href="joins.html">Соединения (JOIN)</a></li>
+            <li><a href="aggregates.html">Агрегации и GROUP BY</a></li>
+            <li><a href="guides/list-tables.html">Гайд: список таблиц</a></li>
+            <li><a href="guides/create-table.html">Гайд: создание таблицы</a></li>
+            <li><a href="guides/list-users.html">Гайд: список пользователей</a></li>
+          </ol>
+          <a class="btn primary track-start" href="install.html">Начать трек</a>
+        </article>
+        <article class="track-card" aria-labelledby="track-middle">
+          <div class="track-meta"><span>Middle</span><span>Развитие</span><span>2–4 недели</span></div>
+          <h3 id="track-middle">Middle</h3>
+          <p class="track-summary">Транзакции, изоляция, индексы, оптимизация, обслуживание, типичные ошибки и инструменты разработчика.</p>
+          <ol class="track-pages">
+            <li><a href="transactions.html">Транзакции и блокировки</a></li>
+            <li><a href="indexes.html">Индексы</a></li>
+            <li><a href="guides/create-index.html">Гайд: создание индекса</a></li>
+            <li><a href="guides/vacuum.html">Гайд: VACUUM</a></li>
+            <li><a href="programming.html">Программирование на стороне БД</a></li>
+            <li><a href="errors.html">Частые ошибки</a></li>
+            <li><a href="tooling.html">Тулинг</a></li>
+          </ol>
+          <a class="btn primary track-start" href="transactions.html">Начать трек</a>
+        </article>
+        <article class="track-card" aria-labelledby="track-senior">
+          <div class="track-meta"><span>Senior</span><span>Прод</span><span>4+ недель</span></div>
+          <h3 id="track-senior">Senior</h3>
+          <p class="track-summary">Планировщик и EXPLAIN, миграции без даунтайма, пулинг, репликация, бэкапы, безопасность, RLS.</p>
+          <ol class="track-pages">
+            <li><a href="scaling.html">Масштабирование</a></li>
+            <li><a href="senior.html">Senior-уровень: производительность и прод</a></li>
+          </ol>
+          <a class="btn primary track-start" href="scaling.html">Начать трек</a>
+        </article>
+      </div>
+    </section>
+
     <!-- ========== 1. Подключение и сессия ========== -->
     <section class="category">
       <h2>1. Подключение и сессия</h2>
