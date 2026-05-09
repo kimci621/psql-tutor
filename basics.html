@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Основы PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=7"></script>
+<script type="module" src="assets/app.js?v=8"></script>
 </head>
 <body>
 <div class="layout">
@@ -372,6 +372,69 @@ ORDER  BY pg_database_size(datname) DESC;</pre>
         </div>
         <div class="desc">
           <p>Страница (page) — единица чтения/записи. Большие значения автоматически уезжают в TOAST, но это прозрачно для пользователя.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category exercises-section" id="exercises">
+      <h2>Упражнения</h2>
+      <p class="sub">Используется учебный датасет (см. <a href="index.html#dataset">раздел «Учебный датасет»</a>). Напиши свой запрос в textarea, потом сравни с эталоном или разбери с ИИ-ментором — он не покажет ответ сразу, а пройдётся по логике.</p>
+
+      <article class="exercise" id="ex-basics-select">
+        <h3>1. Активные пользователи, отсортированные по дате</h3>
+        <div class="ex-task">
+          <p>Из таблицы <code>users</code> выведи <code>id</code>, <code>email</code>, <code>created_at</code> для всех пользователей, у которых <code>is_active = true</code> и <code>deleted_at IS NULL</code>. Отсортируй по дате регистрации, более свежие — сверху.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой SQL"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button" aria-label="Показать или скрыть решение">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-basics-select" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>SELECT id, email, created_at
+FROM   users
+WHERE  is_active = true
+  AND  deleted_at IS NULL
+ORDER  BY created_at DESC;</pre>
+          <p class="ex-note">Условие <code>deleted_at IS NULL</code> нельзя писать как <code>deleted_at = NULL</code>: сравнение с NULL всегда даёт NULL, а WHERE отбирает только TRUE.</p>
+        </div>
+      </article>
+
+      <article class="exercise" id="ex-basics-coalesce">
+        <h3>2. COALESCE для отображаемого имени</h3>
+        <div class="ex-task">
+          <p>Из <code>users</code> выведи <code>id</code> и одно поле <code>display_name</code>. Логика: если есть <code>nickname</code> — берём его; иначе <code>full_name</code>; иначе строку <code>'аноним'</code>. Только активные пользователи (<code>is_active = true</code>).</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой SQL"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-basics-coalesce" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>SELECT id,
+       coalesce(nickname, full_name, 'аноним') AS display_name
+FROM   users
+WHERE  is_active = true
+ORDER  BY id;</pre>
+          <p class="ex-note"><code>coalesce</code> возвращает первый аргумент, не равный NULL. Часто используется для дефолтов на стороне SQL.</p>
+        </div>
+      </article>
+
+      <article class="exercise" id="ex-basics-count">
+        <h3>3. Считаем активных одним запросом</h3>
+        <div class="ex-task">
+          <p>Одним запросом получи две колонки: <code>total</code> — общее число строк в <code>users</code>, <code>active</code> — число тех, у кого <code>is_active = true</code> и <code>deleted_at IS NULL</code>.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой SQL"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-basics-count" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>SELECT count(*)                                              AS total,
+       count(*) FILTER (WHERE is_active AND deleted_at IS NULL) AS active
+FROM   users;</pre>
+          <p class="ex-note"><code>FILTER (WHERE …)</code> — стандартный способ условной агрегации в PostgreSQL. Альтернатива: <code>sum(CASE WHEN … THEN 1 ELSE 0 END)</code>.</p>
         </div>
       </article>
     </section>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Соединения таблиц — PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=7"></script>
+<script type="module" src="assets/app.js?v=8"></script>
 </head>
 <body>
 <div class="layout">
@@ -328,6 +328,73 @@ CREATE TABLE user_profile (
         </div>
         <div class="desc">
           <p>Если профиль есть всегда — поля можно держать прямо в <code>users</code>. 1:1 оправдан, когда «вторая» сущность редкая или сильно отличается по жизненному циклу (например, удаляется отдельно).</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category exercises-section" id="exercises">
+      <h2>Упражнения</h2>
+      <p class="sub">Использует учебный датасет (<a href="index.html#dataset">скачать</a>). Сначала попробуй сам, потом проверь решение или разбери с ИИ.</p>
+
+      <article class="exercise" id="ex-joins-inner">
+        <h3>1. INNER JOIN: заказы и email покупателя</h3>
+        <div class="ex-task">
+          <p>Покажи <code>o.id</code>, <code>u.email</code>, <code>o.status</code>, <code>o.total</code> для всех заказов. Соедини <code>orders</code> и <code>users</code> по <code>user_id</code>. Отсортируй по <code>o.created_at</code> от свежих к старым.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой SQL"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-joins-inner" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>SELECT o.id, u.email, o.status, o.total
+FROM   orders o
+JOIN   users  u ON u.id = o.user_id
+ORDER  BY o.created_at DESC;</pre>
+          <p class="ex-note">INNER JOIN отбрасывает строки без совпадения. Здесь это безопасно: у каждого заказа всегда есть <code>user_id</code> (NOT NULL + FK).</p>
+        </div>
+      </article>
+
+      <article class="exercise" id="ex-joins-left">
+        <h3>2. Anti-join: пользователи без заказов</h3>
+        <div class="ex-task">
+          <p>Через <code>LEFT JOIN</code> выведи <code>u.id</code>, <code>u.email</code> пользователей, у которых нет ни одной строки в <code>orders</code>. Не используй <code>NOT IN</code> — он коварен на NULL.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой SQL"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-joins-left" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>SELECT u.id, u.email
+FROM   users u
+LEFT JOIN orders o ON o.user_id = u.id
+WHERE  o.id IS NULL
+ORDER  BY u.id;</pre>
+          <p class="ex-note">Классический паттерн «anti-join через LEFT JOIN + IS NULL». Альтернатива — <code>NOT EXISTS</code>. <code>NOT IN</code> опасен, если правый набор содержит NULL.</p>
+        </div>
+      </article>
+
+      <article class="exercise" id="ex-joins-aggregate">
+        <h3>3. Топ-3 покупателей по сумме доставленных заказов</h3>
+        <div class="ex-task">
+          <p>Выведи <code>email</code> и сумму его доставленных заказов (<code>status = 'delivered'</code>). Покажи только тех, у кого хотя бы один доставленный заказ. Отсортируй по сумме по убыванию, верхние 3.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой SQL"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-joins-aggregate" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>SELECT u.email,
+       sum(o.total) AS spent
+FROM   users  u
+JOIN   orders o ON o.user_id = u.id
+WHERE  o.status = 'delivered'
+GROUP  BY u.id, u.email
+ORDER  BY spent DESC
+LIMIT  3;</pre>
+          <p class="ex-note">В GROUP BY должны быть все не-агрегированные поля SELECT. Для уникальности достаточно <code>u.id</code>, но <code>u.email</code> тоже разрешён (функционально зависит от PK).</p>
         </div>
       </article>
     </section>

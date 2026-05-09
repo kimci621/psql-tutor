@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Транзакции и изоляция — PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=7"></script>
+<script type="module" src="assets/app.js?v=8"></script>
 </head>
 <body>
 <div class="layout">
@@ -244,6 +244,89 @@ COMMIT;
             <li><strong>Advisory locks</strong> — там же, <a href="senior.html#sr-advisory-locks">«Advisory locks»</a>.</li>
             <li><strong>Серилизационные ошибки</strong> — на странице <a href="errors.html#err-serialization">«Частые ошибки»</a>.</li>
           </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category exercises-section" id="exercises">
+      <h2>Упражнения</h2>
+      <p class="sub">Использует учебный датасет (<a href="index.html#dataset">скачать</a>). В транзакционных задачах важна не только формулировка SQL, но и порядок команд — отрабатывай его в textarea.</p>
+
+      <article class="exercise" id="ex-tx-rollback">
+        <h3>1. BEGIN / COMMIT / ROLLBACK для атомарного переноса</h3>
+        <div class="ex-task">
+          <p>Напиши транзакцию, которая увеличивает <code>in_stock</code> товара с <code>id=1</code> на 5 и уменьшает у товара с <code>id=2</code> на 5. Если у второго товара после операции <code>in_stock &lt; 0</code>, всё надо откатить.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь транзакцию"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-tx-rollback" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>BEGIN;
+
+UPDATE products SET in_stock = in_stock + 5 WHERE id = 1;
+UPDATE products SET in_stock = in_stock - 5 WHERE id = 2;
+
+-- Проверка инварианта; CHECK на колонке тоже бы сработал.
+DO $$
+BEGIN
+  IF (SELECT in_stock FROM products WHERE id = 2) &lt; 0 THEN
+    RAISE EXCEPTION 'in_stock would go negative';
+  END IF;
+END $$;
+
+COMMIT;</pre>
+          <p class="ex-note">Транзакция объединяет обе записи в один атом: либо обе применятся, либо ни одна. <code>CHECK (in_stock &gt;= 0)</code> на колонке сделал бы проверку автоматической — RAISE EXCEPTION приведёт к ROLLBACK всей транзакции.</p>
+        </div>
+      </article>
+
+      <article class="exercise" id="ex-tx-for-update">
+        <h3>2. SELECT FOR UPDATE против lost update</h3>
+        <div class="ex-task">
+          <p>В транзакции прочитай <code>total</code> заказа <code>id = 3</code>, и если он меньше 1000, увеличь его на 100. Сделай так, чтобы между чтением и записью никакая другая сессия не смогла изменить эту строку.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь транзакцию"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-tx-for-update" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>BEGIN;
+
+SELECT total FROM orders WHERE id = 3 FOR UPDATE;
+
+UPDATE orders
+   SET total = total + 100
+ WHERE id = 3
+   AND total &lt; 1000;
+
+COMMIT;</pre>
+          <p class="ex-note"><code>FOR UPDATE</code> берёт row-level lock на читаемые строки до конца транзакции. Альтернатива — оптимистичная блокировка через колонку <code>version</code>.</p>
+        </div>
+      </article>
+
+      <article class="exercise" id="ex-tx-isolation">
+        <h3>3. Какой уровень изоляции выбрать</h3>
+        <div class="ex-task">
+          <p>Сценарий: отчёт «активные пользователи и их сумма заказов» делает 2 запроса в одной транзакции — count активных и sum по доставленным. Между запросами не должны появляться/исчезать строки. Какой минимально достаточный <code>ISOLATION LEVEL</code>? Напиши команду установки и оба запроса.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь транзакцию"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-tx-isolation" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>BEGIN ISOLATION LEVEL REPEATABLE READ;
+
+-- запрос 1: count active users
+SELECT count(*) FROM users WHERE is_active AND deleted_at IS NULL;
+
+-- запрос 2: sum delivered
+SELECT sum(total) FROM orders WHERE status = 'delivered';
+
+COMMIT;</pre>
+          <p class="ex-note"><code>REPEATABLE READ</code> фиксирует снимок данных на момент начала транзакции — все запросы видят одну и ту же версию. <code>SERIALIZABLE</code> дал бы то же и плюс защиту от write skew, но он дороже и здесь не нужен.</p>
         </div>
       </article>
     </section>

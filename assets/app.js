@@ -1,7 +1,8 @@
 import { highlightSQL } from "./sql-highlight.js?v=2";
-import { initChat } from "./chat.js?v=5";
+import { initChat } from "./chat.js?v=6";
 import { loadTheme, saveTheme } from "./settings.js";
 import { findTrackContext, resolveHref } from "./tracks.js?v=1";
+import { initExercises } from "./exercises.js?v=1";
 
 function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
@@ -20,6 +21,11 @@ function initTheme() {
 }
 
 function initCodeBlocks() {
+  // Подсвечиваем SQL и в обычных блоках, и в развороте решений упражнений.
+  document.querySelectorAll(".ex-solution > pre").forEach(pre => {
+    const code = pre.textContent;
+    pre.innerHTML = highlightSQL(code);
+  });
   document.querySelectorAll(".code-block").forEach(block => {
     const pre = block.querySelector("pre");
     if (!pre) return;
@@ -251,5 +257,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initActiveNav();
   initTrackNavigation();
   initTopicAnchors();
+  initExercises();
   initChat();
 });

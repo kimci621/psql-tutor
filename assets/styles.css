@@ -752,6 +752,88 @@ h1.page-title {
   transition: outline-color 1.2s;
 }
 
+/* ===== Упражнения ===== */
+.exercises-section {
+  margin: var(--space-7) 0 var(--space-4);
+}
+.exercises-section .sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 var(--space-4);
+}
+.exercise {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  scroll-margin-top: 20px;
+}
+.exercise h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 16px;
+  line-height: 1.3;
+}
+.exercise .ex-task {
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 var(--space-3);
+}
+.exercise .ex-task p { margin: 0 0 var(--space-2); }
+.exercise .ex-task code {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.exercise textarea.ex-attempt {
+  width: 100%;
+  background: var(--bg-code);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 100px;
+  outline: none;
+}
+.exercise textarea.ex-attempt:focus { border-color: var(--accent); }
+.exercise .ex-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+.exercise .ex-solution {
+  margin-top: var(--space-3);
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: auto;
+}
+.exercise .ex-solution pre {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  white-space: pre;
+  color: var(--text);
+}
+.exercise .ex-solution .ex-note {
+  padding: 0 var(--space-4) var(--space-3);
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
 /* ===== Усиленный focus-ring для a11y ===== */
 :focus-visible {
   outline: 2px solid var(--accent);

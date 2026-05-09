@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Индексы — PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=7"></script>
+<script type="module" src="assets/app.js?v=8"></script>
 </head>
 <body>
 <div class="layout">
@@ -293,6 +293,63 @@ GROUP  BY user_id;</pre>
             <li><a href="senior.html#sr-pg-stat-statements">pg_stat_statements</a> — поиск тяжёлых запросов.</li>
             <li><a href="senior.html#sr-fulltext">Полнотекстовый поиск</a> — про tsvector + GIN.</li>
           </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category exercises-section" id="exercises">
+      <h2>Упражнения</h2>
+      <p class="sub">Использует учебный датасет (<a href="index.html#dataset">скачать</a>). Сначала придумай свой ответ, потом сравни с эталоном.</p>
+
+      <article class="exercise" id="ex-indexes-pick">
+        <h3>1. Какой индекс ускорит запрос</h3>
+        <div class="ex-task">
+          <p>Запрос: <code>SELECT * FROM orders WHERE user_id = $1 AND created_at &gt;= now() - interval '30 days' ORDER BY created_at DESC;</code>. Какой индекс будет наиболее полезен? Напиши <code>CREATE INDEX …</code>.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой CREATE INDEX"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-indexes-pick" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>CREATE INDEX idx_orders_user_created
+  ON orders (user_id, created_at DESC);</pre>
+          <p class="ex-note">Композитный индекс по <code>(user_id, created_at DESC)</code> поддерживает и фильтр, и сортировку. Порядок столбцов: сначала равенство, потом диапазон/сортировка.</p>
+        </div>
+      </article>
+
+      <article class="exercise" id="ex-indexes-partial">
+        <h3>2. Частичный индекс на «горячую» часть</h3>
+        <div class="ex-task">
+          <p>Большая часть заказов имеет статус <code>delivered</code>, но рабочий запрос ищет только <code>pending</code> и <code>paid</code>. Напиши частичный индекс, который ускорит этот запрос: <code>SELECT * FROM orders WHERE status IN ('pending','paid') ORDER BY created_at;</code>.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой CREATE INDEX"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-indexes-partial" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>CREATE INDEX idx_orders_active_status
+  ON orders (created_at)
+  WHERE status IN ('pending', 'paid');</pre>
+          <p class="ex-note">Частичный индекс хранит только нужные строки — он меньше, быстрее обновляется и реально полезен под конкретный запрос. Условие индекса должно быть IMMUTABLE, поэтому <code>now()</code> там нельзя.</p>
+        </div>
+      </article>
+
+      <article class="exercise" id="ex-indexes-functional">
+        <h3>3. Функциональный индекс</h3>
+        <div class="ex-task">
+          <p>Приложение делает запрос: <code>SELECT * FROM users WHERE lower(email) = lower($1);</code>. Обычный индекс по <code>email</code> здесь не сработает. Создай функциональный индекс, который ускорит этот запрос.</p>
+        </div>
+        <textarea class="ex-attempt" placeholder="-- напиши здесь свой CREATE INDEX"></textarea>
+        <div class="ex-actions">
+          <button class="btn ex-toggle" type="button">Показать решение</button>
+          <button class="btn primary" data-topic-id="ex-indexes-functional" data-exercise>💬 Разобрать с ИИ</button>
+        </div>
+        <div class="ex-solution" hidden>
+<pre>CREATE INDEX idx_users_email_lower
+  ON users (lower(email));</pre>
+          <p class="ex-note">Функциональный (выражение) индекс хранит результат выражения. Запрос обязан использовать ровно то же выражение — <code>lower(email)</code> — иначе индекс не подхватится.</p>
         </div>
       </article>
     </section>

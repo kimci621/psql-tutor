@@ -2399,4 +2399,143 @@ export const topics = {
     ],
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
+
+  // ===== Упражнения =====
+  // Каждое упражнение — отдельная "тема" для чата. Стартовый prompt
+  // обогащается условием задачи и попыткой ученика (см. chat.js / prompts.js).
+  "ex-basics-select": {
+    kind: "exercise",
+    title: "Упражнение: первые SELECT и WHERE",
+    summary: "Выбери активных пользователей и отсортируй их по дате регистрации.",
+    task: "Из таблицы `users` выведи `id`, `email`, `created_at` для всех пользователей, у которых `is_active = true` и `deleted_at IS NULL`. Отсортируй по дате регистрации, более свежие — сверху.",
+    solution: "SELECT id, email, created_at\nFROM   users\nWHERE  is_active = true\n  AND  deleted_at IS NULL\nORDER  BY created_at DESC;",
+    solutionNote: "Условие `deleted_at IS NULL` нельзя писать как `deleted_at = NULL` — сравнение с NULL всегда даёт NULL, а WHERE отбирает только TRUE.",
+    examples: [],
+    pitfalls: ["сравнение с NULL через = не работает", "не путай булеву is_active с проверкой на NULL"],
+    learningGoals: ["писать корректные WHERE с NULL", "использовать ORDER BY"]
+  },
+  "ex-basics-coalesce": {
+    kind: "exercise",
+    title: "Упражнение: COALESCE для отображаемого имени",
+    summary: "Сформируй человекочитаемое имя пользователя.",
+    task: "Из `users` выведи `id` и одно поле `display_name`. Логика: если есть `nickname` — берём его; иначе `full_name`; иначе строку `'аноним'`. Только активные пользователи (`is_active = true`).",
+    solution: "SELECT id,\n       coalesce(nickname, full_name, 'аноним') AS display_name\nFROM   users\nWHERE  is_active = true\nORDER  BY id;",
+    solutionNote: "`coalesce` возвращает первый аргумент, не равный NULL. Часто его используют для дефолтов на стороне SQL.",
+    examples: [],
+    pitfalls: ["пустая строка '' и NULL — разные вещи; coalesce пустую строку не «спасёт»"],
+    learningGoals: ["применять coalesce", "понимать порядок аргументов"]
+  },
+  "ex-basics-count": {
+    kind: "exercise",
+    title: "Упражнение: считаем активных",
+    summary: "Сколько активных и сколько всего пользователей.",
+    task: "Одним запросом получи две колонки: `total` — общее число строк в `users`, `active` — число тех, у кого `is_active = true` и `deleted_at IS NULL`.",
+    solution: "SELECT count(*)                                              AS total,\n       count(*) FILTER (WHERE is_active AND deleted_at IS NULL) AS active\nFROM   users;",
+    solutionNote: "`FILTER (WHERE …)` — стандартный способ условной агрегации в PostgreSQL. Альтернатива: `count(*) FILTER (WHERE …)` ↔ `sum(CASE WHEN … THEN 1 ELSE 0 END)`.",
+    examples: [],
+    pitfalls: ["count(col) пропускает NULL, count(*) — нет", "не пиши count(is_active) — оно посчитает все не-NULL, даже false"],
+    learningGoals: ["условная агрегация через FILTER"]
+  },
+
+  "ex-joins-inner": {
+    kind: "exercise",
+    title: "Упражнение: INNER JOIN заказов и пользователей",
+    summary: "Выведи заказы вместе с email покупателя.",
+    task: "Покажи `o.id`, `u.email`, `o.status`, `o.total` для всех заказов. Соедини `orders` и `users` по `user_id`. Отсортируй по `o.created_at` от свежих к старым.",
+    solution: "SELECT o.id, u.email, o.status, o.total\nFROM   orders o\nJOIN   users  u ON u.id = o.user_id\nORDER  BY o.created_at DESC;",
+    solutionNote: "INNER JOIN отбрасывает строки без совпадения. Здесь это безопасно — у каждого заказа всегда есть `user_id` (NOT NULL + FK).",
+    examples: [],
+    pitfalls: ["алиасы таблиц нужны, иначе придётся писать orders.id и users.id"],
+    learningGoals: ["писать INNER JOIN с алиасами", "выбирать поля из двух таблиц"]
+  },
+  "ex-joins-left": {
+    kind: "exercise",
+    title: "Упражнение: пользователи без заказов (LEFT JOIN)",
+    summary: "Найди пользователей, у которых нет ни одного заказа.",
+    task: "Через `LEFT JOIN` выведи `u.id`, `u.email` пользователей, у которых нет ни одной строки в `orders`. Не используй `NOT IN` — он коварен на NULL.",
+    solution: "SELECT u.id, u.email\nFROM   users u\nLEFT JOIN orders o ON o.user_id = u.id\nWHERE  o.id IS NULL\nORDER  BY u.id;",
+    solutionNote: "Классический паттерн «anti-join через LEFT JOIN + IS NULL». Альтернатива — `NOT EXISTS`. Оба плана обычно одинаково хороши; `NOT IN` опасен, если правый набор содержит NULL.",
+    examples: [],
+    pitfalls: ["условие `o.user_id IS NULL` тоже сработает, но логичнее проверять PK правой таблицы", "не путай с INNER JOIN — он бы выкинул как раз искомые строки"],
+    learningGoals: ["реализовывать anti-join", "видеть подвох NOT IN"]
+  },
+  "ex-joins-aggregate": {
+    kind: "exercise",
+    title: "Упражнение: топ покупателей по сумме",
+    summary: "JOIN + GROUP BY + ORDER BY с агрегатом.",
+    task: "Выведи `email` пользователя и сумму его доставленных заказов (`status = 'delivered'`). Покажи только тех, у кого хотя бы один доставленный заказ. Отсортируй по сумме по убыванию, верхние 3.",
+    solution: "SELECT u.email,\n       sum(o.total) AS spent\nFROM   users  u\nJOIN   orders o ON o.user_id = u.id\nWHERE  o.status = 'delivered'\nGROUP  BY u.id, u.email\nORDER  BY spent DESC\nLIMIT  3;",
+    solutionNote: "В GROUP BY — все не-агрегированные поля SELECT. Для уникальности достаточно `u.id`, но `u.email` тоже разрешён, т. к. функционально зависит от PK.",
+    examples: [],
+    pitfalls: ["забыть фильтр по status — посчитаются и cancelled", "пропустить u.email в GROUP BY на старом Postgres даст ошибку"],
+    learningGoals: ["комбинировать JOIN, WHERE, GROUP BY, ORDER BY, LIMIT"]
+  },
+
+  "ex-indexes-pick": {
+    kind: "exercise",
+    title: "Упражнение: какой индекс ускорит запрос",
+    summary: "Подбери индекс под конкретный запрос.",
+    task: "Запрос: `SELECT * FROM orders WHERE user_id = $1 AND created_at >= now() - interval '30 days' ORDER BY created_at DESC;`. Какой индекс будет наиболее полезен? Напиши `CREATE INDEX …`.",
+    solution: "CREATE INDEX idx_orders_user_created\n  ON orders (user_id, created_at DESC);",
+    solutionNote: "Композитный индекс по `(user_id, created_at DESC)` поддерживает и фильтр, и сортировку. Порядок столбцов важен: сначала равенство (`user_id`), потом диапазон/сортировка (`created_at`).",
+    examples: [],
+    pitfalls: ["индекс на одно `user_id` тоже подойдёт, но придётся сортировать вручную", "DESC в индексе не обязательно для диапазона, но помогает ORDER BY DESC без Sort"],
+    learningGoals: ["правило «равенство → диапазон» в композитном индексе"]
+  },
+  "ex-indexes-partial": {
+    kind: "exercise",
+    title: "Упражнение: частичный индекс",
+    summary: "Маленький индекс под «горячую» часть таблицы.",
+    task: "Большая часть заказов имеет статус `delivered`, но рабочий запрос ищет только `pending` и `paid`. Напиши частичный индекс, который ускорит этот запрос: `SELECT * FROM orders WHERE status IN ('pending','paid') ORDER BY created_at;`.",
+    solution: "CREATE INDEX idx_orders_active_status\n  ON orders (created_at)\n  WHERE status IN ('pending', 'paid');",
+    solutionNote: "Частичный индекс хранит только нужные строки — он меньше, быстрее обновляется и реально полезен под конкретный запрос.",
+    examples: [],
+    pitfalls: ["условие индекса должно быть IMMUTABLE — `now()` туда нельзя", "запрос обязан включать то же условие, иначе планировщик индекс не выберет"],
+    learningGoals: ["писать партикулярные индексы", "понимать совпадение predicate"]
+  },
+  "ex-indexes-functional": {
+    kind: "exercise",
+    title: "Упражнение: индекс по выражению",
+    summary: "Регистронезависимый поиск email.",
+    task: "Приложение делает запрос: `SELECT * FROM users WHERE lower(email) = lower($1);`. Обычный индекс по `email` тут не сработает. Создай функциональный индекс, который ускорит этот запрос.",
+    solution: "CREATE INDEX idx_users_email_lower\n  ON users (lower(email));",
+    solutionNote: "Функциональный (выражение) индекс хранит результат выражения. Запрос обязан использовать ровно то же выражение — `lower(email)` — иначе индекс не подхватится.",
+    examples: [],
+    pitfalls: ["UNIQUE индекс по `email` не подойдёт — это другое выражение", "выражение в индексе должно быть IMMUTABLE"],
+    learningGoals: ["создавать функциональные индексы", "видеть несовпадение выражений"]
+  },
+
+  "ex-tx-rollback": {
+    kind: "exercise",
+    title: "Упражнение: BEGIN / COMMIT / ROLLBACK",
+    summary: "Перенос денег между двумя строками — атомарно.",
+    task: "Напиши транзакцию, которая увеличивает `in_stock` товара с `id=1` на 5 и уменьшает у товара с `id=2` на 5. Если у второго товара после операции `in_stock < 0`, всё надо откатить.",
+    solution: "BEGIN;\n\nUPDATE products SET in_stock = in_stock + 5 WHERE id = 1;\nUPDATE products SET in_stock = in_stock - 5 WHERE id = 2;\n\n-- Проверка инварианта; CHECK на колонке тоже бы сработал.\nDO $$\nBEGIN\n  IF (SELECT in_stock FROM products WHERE id = 2) < 0 THEN\n    RAISE EXCEPTION 'in_stock would go negative';\n  END IF;\nEND $$;\n\nCOMMIT;",
+    solutionNote: "Транзакция объединяет обе записи в один атом: либо обе применятся, либо ни одна. CHECK-constraint на колонке (`CHECK (in_stock >= 0)`) сделал бы проверку автоматической — RAISE EXCEPTION приведёт к ROLLBACK всей транзакции.",
+    examples: [],
+    pitfalls: ["без BEGIN каждый UPDATE — отдельная транзакция и автоматически коммитится", "после ошибки внутри транзакции остальные команды не выполнятся, нужен ROLLBACK или SAVEPOINT"],
+    learningGoals: ["обрамлять связанные команды в одну транзакцию", "понимать атомарность"]
+  },
+  "ex-tx-for-update": {
+    kind: "exercise",
+    title: "Упражнение: SELECT FOR UPDATE",
+    summary: "Защита от конкурентной модификации.",
+    task: "В транзакции: прочитай `total` заказа `id = 3`, и если он меньше 1000, увеличь его на 100. Сделай так, чтобы между чтением и записью никакая другая сессия не смогла изменить эту строку.",
+    solution: "BEGIN;\n\nSELECT total FROM orders WHERE id = 3 FOR UPDATE;\n\nUPDATE orders\n   SET total = total + 100\n WHERE id = 3\n   AND total < 1000;\n\nCOMMIT;",
+    solutionNote: "`FOR UPDATE` берёт row-level lock на читаемые строки до конца транзакции. Альтернатива — оптимистичная блокировка через версионирование (колонка `version` + проверка в WHERE).",
+    examples: [],
+    pitfalls: ["без FOR UPDATE возможна гонка: оба воркера прочтут старое значение и затрут друг друга (lost update)", "FOR UPDATE без транзакции — синтаксически валиден, но бесполезен: блокировка снимется немедленно"],
+    learningGoals: ["использовать row-level locks", "понимать lost update"]
+  },
+  "ex-tx-isolation": {
+    kind: "exercise",
+    title: "Упражнение: какой уровень изоляции",
+    summary: "Подбери минимально достаточный уровень.",
+    task: "Сценарий: отчёт «активные пользователи и их сумма заказов» делает 2 запроса в одной транзакции — count активных и sum по доставленным. Между запросами не должны появляться/исчезать строки. Какой минимально достаточный `ISOLATION LEVEL`? Напиши команду установки.",
+    solution: "BEGIN ISOLATION LEVEL REPEATABLE READ;\n\n-- запрос 1: count active users\nSELECT count(*) FROM users WHERE is_active AND deleted_at IS NULL;\n\n-- запрос 2: sum delivered\nSELECT sum(total) FROM orders WHERE status = 'delivered';\n\nCOMMIT;",
+    solutionNote: "`REPEATABLE READ` фиксирует снимок данных на момент начала транзакции — все запросы внутри видят одну и ту же версию БД. `SERIALIZABLE` дал бы то же и плюс защиту от write skew, но он дороже и здесь не нужен.",
+    examples: [],
+    pitfalls: ["READ COMMITTED (по умолчанию) допускает фантомы между запросами", "SERIALIZABLE может бросить serialization_failure — приложение должно уметь повторять транзакцию"],
+    learningGoals: ["понимать уровни изоляции", "выбирать минимально нужный"]
+  },
 };
