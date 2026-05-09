@@ -4,6 +4,7 @@ import { loadTheme, saveTheme } from "./settings.js";
 import { findTrackContext, resolveHref, tracks } from "./tracks.js?v=2";
 import { initExercises } from "./exercises.js?v=1";
 import { initProgressControls, initSidebarProgress } from "./progress.js?v=1";
+import { initSearch } from "./search.js?v=1";
 
 function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
@@ -260,6 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTopicAnchors();
   initExercises();
   initProgressTracking();
+  initSearch();
   initChat();
 });
 

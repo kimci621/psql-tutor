@@ -752,6 +752,91 @@ h1.page-title {
   transition: outline-color 1.2s;
 }
 
+/* ===== Поиск (Cmd/Ctrl+K) ===== */
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: none;
+  z-index: 70;
+  padding: 80px 16px 16px;
+}
+.search-overlay.open { display: block; }
+.search-box {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: var(--space-3);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 70vh;
+}
+.search-input {
+  width: 100%;
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.search-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--text);
+}
+.search-item:hover, .search-item.active {
+  background: var(--accent-soft);
+  text-decoration: none;
+}
+.search-item .si-title {
+  font-weight: 600;
+  font-size: 14px;
+  grid-column: 1;
+}
+.search-item .si-sum {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  grid-column: 1;
+}
+.search-item .si-page {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-family: var(--mono);
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+.search-empty {
+  color: var(--text-muted);
+  padding: var(--space-3);
+  text-align: center;
+  font-size: 13px;
+}
+.search-hint {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-align: center;
+}
+
 /* ===== Прогресс-трекинг ===== */
 .progress-controls {
   display: flex;
