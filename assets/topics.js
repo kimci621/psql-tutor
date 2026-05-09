@@ -2400,6 +2400,70 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  // ===== copy.html =====
+  "copy-formats": {
+    title: "Форматы COPY: TEXT, CSV, BINARY",
+    summary: "Три формата с разными свойствами.",
+    examples: [
+      "COPY users FROM '/tmp/users.csv' WITH (FORMAT csv, HEADER);",
+      "COPY orders TO '/tmp/orders.bin' WITH (FORMAT binary);"
+    ],
+    pitfalls: [
+      "TEXT — tab-separated с escape; не путай с CSV",
+      "BINARY быстрее, но нечитаем и привязан к версии/архитектуре",
+      "FORMAT csv требует HEADER, если файл с заголовками"
+    ],
+    learningGoals: ["выбирать формат под задачу"]
+  },
+  "copy-stdin": {
+    title: "\\copy и COPY FROM STDIN",
+    summary: "Загрузка с клиента, без доступа сервера к файлам.",
+    examples: [
+      "psql -d app -c \"\\copy users FROM '/local/users.csv' WITH (FORMAT csv, HEADER)\"",
+      "cat users.csv | psql -d app -c \"COPY users FROM STDIN WITH (FORMAT csv, HEADER)\""
+    ],
+    pitfalls: [
+      "COPY 'path' читает файл на сервере, нужны права",
+      "\\copy — это команда psql, не SQL"
+    ],
+    learningGoals: ["загружать локальные файлы без серверных прав"]
+  },
+  "copy-tuning": {
+    title: "Тюнинг массовой загрузки",
+    summary: "UNLOGGED, удаление индексов, maintenance_work_mem.",
+    examples: [
+      "ALTER TABLE big_table SET UNLOGGED;\nDROP INDEX ...;\nSET maintenance_work_mem = '1GB';\nCOPY big_table FROM '/data/big.csv' WITH (FORMAT csv, HEADER);\nALTER TABLE big_table SET LOGGED;\nCREATE INDEX ...;\nANALYZE big_table;"
+    ],
+    pitfalls: [
+      "UNLOGGED не реплицируется и теряется при крэше",
+      "FK и индексы во время COPY дорого; ребилди после",
+      "Без ANALYZE планировщик слепой"
+    ],
+    learningGoals: ["ускорять разовые загрузки", "возвращать ограничения после"]
+  },
+  "copy-from-program": {
+    title: "COPY FROM PROGRAM",
+    summary: "Принимаем stdout произвольной команды как вход COPY.",
+    examples: [
+      "COPY users FROM PROGRAM 'gunzip -c /data/users.csv.gz' WITH (FORMAT csv, HEADER);"
+    ],
+    pitfalls: [
+      "Команда выполняется на сервере от имени postgres — мощная и опасная функция",
+      "С PG 11 — роль pg_execute_server_program вместо полного SUPERUSER"
+    ],
+    learningGoals: ["применять с осторожностью"]
+  },
+  "copy-vs-pgdump": {
+    title: "COPY vs pg_dump",
+    summary: "Какой инструмент для какой задачи.",
+    examples: [],
+    pitfalls: [
+      "pg_dump — структура + данные одной БД; COPY — только данные",
+      "pg_restore -j параллелит данные и индексы; COPY однопоточный"
+    ],
+    learningGoals: ["выбирать инструмент под сценарий переноса"]
+  },
+
   // ===== JSONB углубление =====
   "jsonb-ops-vs-pathops": {
     title: "jsonb_ops vs jsonb_path_ops",

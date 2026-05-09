@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COPY и массовая загрузка — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=16"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="cheatsheet.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="window.html">Оконные функции</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="copy.html">COPY и загрузка</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="security.html">Безопасность</a></li>
+      <li><a href="tuning.html">Конфигурация и тюнинг</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · COPY и массовая загрузка</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">COPY и массовая загрузка</h1>
+    <p class="page-lead">
+      Загружать миллионы строк <code>INSERT</code>-ами — медленно. <code>COPY</code> — родной способ Postgres
+      перекачивать данные пачкой; на нём же построены <code>pg_dump</code> и <code>pg_restore</code>.
+    </p>
+
+    <section class="category">
+      <h2>1. Форматы COPY</h2>
+
+      <article class="topic" id="copy-formats">
+        <h3>Text, CSV, Binary</h3>
+        <p class="summary">Три формата, разная скорость и компромиссы.</p>
+        <div class="code-block">
+          <pre>-- TEXT (по умолчанию): tab-separated, NULL = '\N'.
+COPY users (id, email) TO '/tmp/users.tsv';
+COPY users (id, email) FROM '/tmp/users.tsv';
+
+-- CSV: с заголовками, кавычками, выбираемыми разделителями.
+COPY users (id, email, full_name)
+  TO '/tmp/users.csv'
+  WITH (FORMAT csv, HEADER, DELIMITER ',', QUOTE '"', NULL '');
+
+COPY users (id, email, full_name)
+  FROM '/tmp/users.csv'
+  WITH (FORMAT csv, HEADER);
+
+-- BINARY: точный, типобезопасный, нечитаемый глазами.
+COPY orders TO '/tmp/orders.bin' WITH (FORMAT binary);
+COPY orders FROM '/tmp/orders.bin' WITH (FORMAT binary);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="copy-formats">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>TEXT</strong> — компактнее CSV, но без HEADER и со специальными escape-ами (<code>\t</code>, <code>\n</code>, <code>\\</code>).</li>
+            <li><strong>CSV</strong> — стандарт обмена с другими системами; чуть медленнее.</li>
+            <li><strong>BINARY</strong> — самый быстрый и точный (типы сохраняются один-в-один), но привязан к версии Postgres и порядку байт. Между разными СУБД не переносится.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. STDIN / STDOUT и клиентский COPY</h2>
+
+      <article class="topic" id="copy-stdin">
+        <h3>\copy в psql и COPY ... FROM STDIN</h3>
+        <p class="summary">Когда сервер не имеет доступа к файлам клиента.</p>
+        <div class="code-block">
+          <pre># \copy в psql — выполняется на стороне клиента, файл читается локально.
+psql -d app -c "\copy users FROM '/local/path/users.csv' WITH (FORMAT csv, HEADER)"
+
+# Альтернатива: COPY ... FROM STDIN с пайпом:
+cat users.csv | psql -d app -c "COPY users FROM STDIN WITH (FORMAT csv, HEADER)"
+
+# Из приложения (драйвер):
+# Python (psycopg):
+#   with conn.cursor() as cur:
+#       with open('users.csv', 'rb') as f:
+#           cur.copy_expert("COPY users FROM STDIN WITH (FORMAT csv, HEADER)", f)</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="copy-stdin">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>COPY 'path'</code> читает файл <em>на сервере</em> — нужен доступ суперпользователя или роль <code>pg_read_server_files</code>.</li>
+            <li><code>\copy</code> в psql — то же, но через STDIN. Файл доступен только клиенту, серверу никаких прав не нужно.</li>
+            <li>Драйверы (psycopg, pgx, JDBC) умеют COPY-протокол напрямую — стандартный способ загрузки из приложения.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Тюнинг массовой загрузки</h2>
+
+      <article class="topic" id="copy-tuning">
+        <h3>Что выкрутить для разовой большой загрузки</h3>
+        <p class="summary">Снимаем индексы и FK, поднимаем память, потом возвращаем.</p>
+        <div class="code-block">
+          <pre>-- 1. Готовим целевую таблицу (новый кластер или пустая):
+ALTER TABLE big_table SET UNLOGGED;       -- если можно потерять при крэше
+DROP INDEX IF EXISTS idx_big_*;
+
+-- 2. На сессию:
+SET maintenance_work_mem = '1GB';
+SET synchronous_commit  = off;            -- риск потерять последнее на крэше
+SET work_mem            = '128MB';
+
+-- 3. Сама загрузка:
+COPY big_table FROM '/data/big.csv' WITH (FORMAT csv, HEADER);
+
+-- 4. Возвращаем:
+ALTER TABLE big_table SET LOGGED;
+CREATE INDEX idx_big_a ON big_table (a);
+CREATE INDEX idx_big_b ON big_table (b);
+ANALYZE big_table;
+RESET synchronous_commit;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="copy-tuning">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>UNLOGGED</code>-таблицы пишут только в heap, не в WAL — на порядок быстрее, но не реплицируются и теряются при крэше.</li>
+            <li>Создавать индексы <em>после</em> загрузки в разы быстрее, чем поддерживать их во время COPY.</li>
+            <li>Внешние ключи проверяются на каждой вставке — на массовой загрузке часто их временно отключают (<code>ALTER TABLE ... DISABLE TRIGGER ALL</code>), но это требует осторожности — нарушения уйдут незамеченными.</li>
+            <li>После загрузки — обязательно <code>ANALYZE</code>: иначе планировщик не знает статистику новых данных.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. COPY ... FROM PROGRAM</h2>
+
+      <article class="topic" id="copy-from-program">
+        <h3>Загрузка из конвейера</h3>
+        <p class="summary">Запустить команду на сервере и принять её stdout как COPY-вход.</p>
+        <div class="code-block">
+          <pre>-- из gzip-файла на сервере:
+COPY users FROM PROGRAM 'gunzip -c /data/users.csv.gz'
+  WITH (FORMAT csv, HEADER);
+
+-- из удалённой таблицы через postgres_fdw:
+COPY local_users FROM PROGRAM 'psql -h remote -d app -c "\\copy users TO STDOUT WITH (FORMAT csv)"'
+  WITH (FORMAT csv);
+
+-- генерация на лету:
+COPY ts FROM PROGRAM 'date -u +%FT%T'
+  WITH (FORMAT csv);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="copy-from-program">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Команда выполняется <em>на сервере</em> от имени роли <code>postgres</code>. Это серьёзная привилегия — по умолчанию доступно только суперпользователю.</li>
+            <li>С PG 11 есть роль <code>pg_execute_server_program</code> — можно делегировать без полного SUPERUSER.</li>
+            <li>Не трогай эту функцию, если не уверен в безопасности окружения.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. COPY vs pg_dump</h2>
+
+      <article class="topic" id="copy-vs-pgdump">
+        <h3>Когда что использовать</h3>
+        <p class="summary">Оба используют COPY-протокол под капотом, но решают разные задачи.</p>
+        <div class="desc">
+          <table class="compare-table">
+            <thead><tr><th>Задача</th><th>Инструмент</th></tr></thead>
+            <tbody>
+              <tr><td>Загрузить CSV из внешней системы</td><td><code>COPY ... FROM</code> или <code>\copy</code></td></tr>
+              <tr><td>Выгрузить таблицу как CSV для другой системы</td><td><code>COPY ... TO</code></td></tr>
+              <tr><td>Перенести БД целиком (структура + данные)</td><td><code>pg_dump -Fc</code> + <code>pg_restore -j</code></td></tr>
+              <tr><td>Перенести только данные таблицы между Postgres-кластерами</td><td><code>COPY TO STDOUT</code> | <code>COPY FROM STDIN</code></td></tr>
+              <tr><td>Логическая репликация / CDC</td><td>logical replication, Debezium</td></tr>
+              <tr><td>Параллельный restore из дампа</td><td><code>pg_restore -j N</code> (см. <a href="senior.html#sr-pgrestore-parallel">backup → parallel restore</a>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="copy-vs-pgdump">💬 Поучиться с ИИ</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Связанные темы</h2>
+      <article class="topic concept">
+        <h3>Где ещё</h3>
+        <div class="desc">
+          <ul>
+            <li><a href="senior.html#sr-pgrestore-parallel">pg_restore -j</a> — параллельное восстановление дампа.</li>
+            <li><a href="tuning.html#cfg-maintenance-work-mem">maintenance_work_mem</a> — память под массовые операции.</li>
+            <li><a href="senior.html#sr-pgdump-formats">pg_dump форматы</a> — какой формат под перенос.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

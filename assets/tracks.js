@@ -33,6 +33,7 @@ export const tracks = [
       { href: 'indexes.html', title: 'Индексы' },
       { href: 'guides/create-index.html', title: 'Гайд: создание индекса' },
       { href: 'guides/vacuum.html', title: 'Гайд: VACUUM' },
+      { href: 'copy.html', title: 'COPY и массовая загрузка' },
       { href: 'programming.html', title: 'Программирование на стороне БД' },
       { href: 'errors.html', title: 'Частые ошибки' },
       { href: 'tooling.html', title: 'Тулинг' }
