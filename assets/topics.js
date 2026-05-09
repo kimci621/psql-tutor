@@ -2400,6 +2400,105 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  // ===== security.html =====
+  "sec-pg-hba": {
+    title: "pg_hba.conf и порядок правил",
+    summary: "Кто, откуда, в какую БД и под какой ролью может подключаться.",
+    examples: [
+      "host    all       app           10.0.0.0/8      scram-sha-256",
+      "hostssl all       all           0.0.0.0/0       scram-sha-256",
+      "SELECT * FROM pg_hba_file_rules;"
+    ],
+    pitfalls: [
+      "Правила применяются по порядку — первая подходящая выигрывает",
+      "trust на проде — это дыра; используй scram-sha-256",
+      "После правки нужен SELECT pg_reload_conf(); перезапуск не требуется"
+    ],
+    learningGoals: ["читать pg_hba.conf", "понимать local/host/hostssl/hostnossl"]
+  },
+  "sec-auth-methods": {
+    title: "Методы аутентификации",
+    summary: "scram-sha-256, md5, peer, cert, gss/sspi.",
+    examples: [
+      "ALTER SYSTEM SET password_encryption = 'scram-sha-256';\nALTER ROLE app WITH PASSWORD 'newpass';"
+    ],
+    pitfalls: [
+      "md5 — устаревший; меняй на scram-sha-256",
+      "peer работает только для local-сокетов",
+      "cert требует клиентский сертификат; имя CN мапится на роль"
+    ],
+    learningGoals: ["выбирать метод аутентификации под сценарий"]
+  },
+  "sec-tls": {
+    title: "TLS / SSL для подключений",
+    summary: "Шифрование канала, проверка сертификата клиента.",
+    examples: [
+      "ssl = on\nssl_cert_file = '/etc/postgresql/server.crt'\nssl_key_file = '/etc/postgresql/server.key'",
+      "SELECT ssl, version, cipher FROM pg_stat_ssl WHERE pid = pg_backend_pid();"
+    ],
+    pitfalls: [
+      "sslmode=require не защищает от MITM; нужен verify-full",
+      "self-signed сертификат без verify-full — ложное чувство безопасности",
+      "hostnossl ... reject — гарантия, что в обход TLS не зайдёт никто"
+    ],
+    learningGoals: ["настроить TLS на сервере и клиенте"]
+  },
+  "sec-roles": {
+    title: "Роли, группы, SET ROLE",
+    summary: "В Postgres нет отдельных пользователей и групп — только роли.",
+    examples: [
+      "CREATE ROLE app_readonly NOLOGIN;\nGRANT app_readonly TO alice;\nSET ROLE app_readonly;",
+      "SELECT current_user, session_user;"
+    ],
+    pitfalls: [
+      "session_user vs current_user — после SET ROLE они разные",
+      "INHERIT — права групп активны автоматически, иначе нужно SET ROLE",
+      "SUPERUSER обходит RLS и все проверки прав"
+    ],
+    learningGoals: ["строить иерархию ролей", "не выдавать SUPERUSER приложениям"]
+  },
+  "sec-grant-revoke": {
+    title: "GRANT и REVOKE",
+    summary: "Права на БД, схему, таблицу, колонку; роль PUBLIC.",
+    examples: [
+      "REVOKE ALL ON SCHEMA public FROM PUBLIC;\nGRANT USAGE ON SCHEMA public TO app_readonly;\nGRANT SELECT ON ALL TABLES IN SCHEMA public TO app_readonly;",
+      "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO app_readonly;"
+    ],
+    pitfalls: [
+      "Без USAGE на схему ни один SELECT внутри не сработает",
+      "GRANT ON ALL TABLES — снимок, новые таблицы прав не получат",
+      "PUBLIC — псевдо-роль «все остальные», по умолчанию у неё много прав"
+    ],
+    learningGoals: ["раздавать минимально нужные права", "пользоваться ALTER DEFAULT PRIVILEGES"]
+  },
+  "sec-grant-patterns": {
+    title: "Паттерны: readonly / writer / migrator",
+    summary: "Готовая раскладка ролей под типичный сервис.",
+    examples: [
+      "CREATE ROLE app_readonly NOLOGIN;\nCREATE ROLE app_writer NOLOGIN;\nCREATE ROLE app_migrator NOLOGIN;\nCREATE ROLE svc_app LOGIN PASSWORD '...' IN ROLE app_writer;"
+    ],
+    pitfalls: [
+      "BI-сервис не должен ходить под тем же логином, что и пишущий",
+      "Деплой/миграции — отдельный пароль, который можно ротировать",
+      "Без INHERIT в роли логина права групп не подхватятся автоматически"
+    ],
+    learningGoals: ["разделять группы по обязанностям"]
+  },
+  "sec-audit": {
+    title: "Логирование и аудит",
+    summary: "log_connections, log_statement, pgaudit, pg_event_trigger.",
+    examples: [
+      "log_connections = on\nlog_disconnections = on\nlog_statement = 'ddl'\nlog_min_duration_statement = 200ms",
+      "CREATE EXTENSION pgaudit;\n-- shared_preload_libraries = 'pgaudit'\n-- pgaudit.log = 'ddl, role, write'"
+    ],
+    pitfalls: [
+      "log_statement = 'all' — это много гигабайт и потенциальная утечка PII",
+      "pgaudit требует shared_preload_libraries и рестарта",
+      "Логи и БД должны быть с разным доступом, иначе компрометация снимает аудит"
+    ],
+    learningGoals: ["настроить базовый аудит", "не утопить диск логом"]
+  },
+
   // ===== Расширения programming.html =====
   "cursors": {
     title: "Курсоры в PostgreSQL",

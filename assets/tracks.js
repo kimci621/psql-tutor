@@ -45,6 +45,7 @@ export const tracks = [
     estimate: '4+ недель',
     pages: [
       { href: 'scaling.html', title: 'Масштабирование' },
+      { href: 'security.html', title: 'Безопасность' },
       { href: 'senior.html', title: 'Senior-уровень: производительность и прод' }
     ]
   }

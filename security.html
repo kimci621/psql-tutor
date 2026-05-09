@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Безопасность PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=9"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="cheatsheet.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="security.html">Безопасность</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Безопасность</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Безопасность PostgreSQL</h1>
+    <p class="page-lead">
+      Кто имеет право подключаться к серверу, по какому каналу, под какой ролью и с какими правами на объекты.
+      Тема большая — здесь собраны главные кирпичи: <code>pg_hba.conf</code>, TLS, аутентификация,
+      иерархия ролей, права на объекты и базовый аудит.
+    </p>
+
+    <section class="category">
+      <h2>1. pg_hba.conf — кто может подключаться</h2>
+
+      <article class="topic" id="sec-pg-hba">
+        <h3>Файл pg_hba.conf и порядок правил</h3>
+        <p class="summary">Постгрес читает строки <em>сверху вниз</em> и применяет первую подходящую. Если ни одна не подошла — доступ запрещён.</p>
+        <div class="code-block">
+          <pre># TYPE  DATABASE  USER          ADDRESS         METHOD
+local   all       postgres                      peer
+local   all       all                           scram-sha-256
+host    all       app           10.0.0.0/8      scram-sha-256
+hostssl all       reporter      0.0.0.0/0       scram-sha-256
+hostnossl all     all           0.0.0.0/0       reject
+host    replication repl_user   10.0.0.0/8      scram-sha-256</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sec-pg-hba">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>local</code> — UNIX-сокет; <code>host</code> — TCP; <code>hostssl</code> / <code>hostnossl</code> — только зашифрованные / только незашифрованные.</li>
+            <li><code>peer</code> сравнивает имя ОС-пользователя с именем роли (только для <code>local</code>) — удобно для локальной разработки и автоматики.</li>
+            <li><code>trust</code> — без пароля. На проде запрещено всегда. На dev — только если знаешь, зачем.</li>
+            <li>После правки — <code>SELECT pg_reload_conf();</code> или <code>SIGHUP</code>. Перезапуск сервера для этого не нужен.</li>
+            <li>Проверить, какая строка примерилась: <code>SELECT * FROM pg_hba_file_rules;</code>.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sec-auth-methods">
+        <h3>Методы аутентификации</h3>
+        <p class="summary">Что именно проверяется и как: пароль, сертификат, GSSAPI/Kerberos, peer.</p>
+        <div class="code-block">
+          <pre>-- Включаем хеширование scram-sha-256 для всех новых паролей:
+ALTER SYSTEM SET password_encryption = 'scram-sha-256';
+SELECT pg_reload_conf();
+
+-- Перевыпустить пароль роли в новом формате:
+ALTER ROLE app WITH PASSWORD 'newpass';
+
+-- Посмотреть, как роль хранится:
+SELECT rolname, rolpassword IS NOT NULL AS has_password
+FROM   pg_authid WHERE rolname = 'app';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sec-auth-methods">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>scram-sha-256</code> — современный дефолт. Не передаёт пароль и хеш в открытом виде, защищён от replay-атак.</li>
+            <li><code>md5</code> — устаревший, оставлен для совместимости. Меняй на scram при первой возможности.</li>
+            <li><code>cert</code> — клиентский сертификат TLS вместо пароля. Поле CN сравнивается с именем роли (или мапится через <code>pg_ident.conf</code>).</li>
+            <li><code>peer</code> — только для <code>local</code>: имя ОС-пользователя ↔ имя роли.</li>
+            <li><code>gss</code> / <code>sspi</code> — Kerberos / Windows домен. Нужно только в корпоративной инфраструктуре.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. TLS / SSL</h2>
+
+      <article class="topic" id="sec-tls">
+        <h3>Включение TLS на сервере</h3>
+        <p class="summary">Шифрует канал между клиентом и сервером; опционально проверяет сертификат клиента.</p>
+        <div class="code-block">
+          <pre># postgresql.conf
+ssl = on
+ssl_cert_file = '/etc/postgresql/server.crt'
+ssl_key_file  = '/etc/postgresql/server.key'
+ssl_ca_file   = '/etc/postgresql/root.crt'   -- если проверяем клиентов
+
+# pg_hba.conf — требовать SSL для удалённых:
+hostssl   all   all   0.0.0.0/0   scram-sha-256
+hostnossl all   all   0.0.0.0/0   reject</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sec-tls">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>На стороне клиента — <code>sslmode=verify-full</code>. Это проверяет и шифр, и подпись CA, и совпадение hostname с CN сертификата.</li>
+            <li><code>sslmode=require</code> — только шифр, без проверки подлинности (MITM возможен).</li>
+            <li>Проверить активную сессию: <code>SELECT ssl, version, cipher FROM pg_stat_ssl WHERE pid = pg_backend_pid();</code>.</li>
+            <li>На проде используй валидный сертификат от CA (Let's Encrypt / внутренний CA), не self-signed без проверки.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Роли и иерархия</h2>
+
+      <article class="topic" id="sec-roles">
+        <h3>Роли, группы и SET ROLE</h3>
+        <p class="summary">В Postgres нет отдельных «пользователей» и «групп» — только роли. Право входа — атрибут <code>LOGIN</code>; группы — это роли без LOGIN, в которые включены другие роли.</p>
+        <div class="code-block">
+          <pre>-- Группа (без LOGIN):
+CREATE ROLE app_readonly NOLOGIN;
+CREATE ROLE app_writer   NOLOGIN;
+
+-- Конкретные пользователи:
+CREATE ROLE alice    LOGIN PASSWORD '...';
+CREATE ROLE alice_ci LOGIN PASSWORD '...';
+
+-- Включить пользователя в группы:
+GRANT app_readonly TO alice;
+GRANT app_writer   TO alice;
+
+-- В сессии переключиться на роль группы (для проверки прав):
+SET ROLE app_readonly;
+SELECT current_user, session_user;   -- current=app_readonly, session=alice
+RESET ROLE;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sec-roles">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>session_user</code> — кто реально вошёл; <code>current_user</code> — чьи права действуют сейчас (после <code>SET ROLE</code>).</li>
+            <li>Атрибут <code>INHERIT</code> (по умолчанию) — права групп активируются автоматически. Без <code>INHERIT</code> их надо явно «надевать» через <code>SET ROLE</code>.</li>
+            <li><code>SUPERUSER</code> обходит все проверки прав и RLS — выдавай только для admin-задач.</li>
+            <li>Для приложений правило: один пользователь БД на сервис, минимум прав, никаких SUPERUSER.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sec-grant-revoke">
+        <h3>GRANT / REVOKE: что разрешать</h3>
+        <p class="summary">Права действуют на уровне БД, схемы, объекта и колонки. Public-роль — особый «все остальные».</p>
+        <div class="code-block">
+          <pre>-- Жёсткий старт: убираем дефолтные права у PUBLIC.
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+
+-- Раздаём минимум:
+GRANT USAGE ON SCHEMA public TO app_readonly, app_writer;
+
+GRANT SELECT
+  ON ALL TABLES IN SCHEMA public
+  TO app_readonly;
+
+GRANT INSERT, UPDATE, DELETE
+  ON TABLE orders, order_items
+  TO app_writer;
+
+-- Чтобы права автоматически наследовались для новых таблиц:
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT ON TABLES TO app_readonly;
+
+-- Проверить эффективные права:
+SELECT grantee, privilege_type
+FROM   information_schema.table_privileges
+WHERE  table_name = 'orders';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sec-grant-revoke">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Без <code>USAGE ON SCHEMA</code> ни <code>SELECT</code> на таблицу не сработает — это частая ловушка.</li>
+            <li><code>ALTER DEFAULT PRIVILEGES</code> назначает права на ещё не созданные объекты. Назначай от имени владельца таблиц.</li>
+            <li><code>GRANT … ON ALL TABLES IN SCHEMA</code> — одноразовый снимок: новые таблицы прав не получат, для них нужен <code>ALTER DEFAULT PRIVILEGES</code>.</li>
+            <li>Для row-level granularity — Row-Level Security (см. <a href="senior.html#sr-rls">RLS на senior-уровне</a>).</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sec-grant-patterns">
+        <h3>Паттерн: read-only / writer / migrator</h3>
+        <p class="summary">Готовая раскладка ролей, которую можно адаптировать под почти любой проект.</p>
+        <div class="code-block">
+          <pre>-- 1. Группы по ролям в системе:
+CREATE ROLE app_readonly NOLOGIN;
+CREATE ROLE app_writer   NOLOGIN;
+CREATE ROLE app_migrator NOLOGIN;
+
+-- 2. Права на схему/таблицы:
+GRANT USAGE ON SCHEMA public TO app_readonly, app_writer, app_migrator;
+
+GRANT SELECT          ON ALL TABLES IN SCHEMA public TO app_readonly;
+GRANT INSERT, UPDATE, DELETE
+                       ON ALL TABLES IN SCHEMA public TO app_writer;
+GRANT ALL             ON SCHEMA public                TO app_migrator;
+GRANT ALL             ON ALL TABLES IN SCHEMA public TO app_migrator;
+
+-- Чтобы новые таблицы автоматически получали права:
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT ON TABLES TO app_readonly;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT INSERT, UPDATE, DELETE ON TABLES TO app_writer;
+
+-- 3. Логины приложения наследуют от групп:
+CREATE ROLE svc_app   LOGIN PASSWORD '...' IN ROLE app_writer;
+CREATE ROLE svc_bi    LOGIN PASSWORD '...' IN ROLE app_readonly;
+CREATE ROLE svc_deploy LOGIN PASSWORD '...' IN ROLE app_migrator;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sec-grant-patterns">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>BI-сервис ходит под <code>svc_bi</code> и не может ничего испортить. Деплой/миграции — отдельный логин, чтобы можно было ротировать его пароль и не давать обычному приложению DDL-прав.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Аудит</h2>
+
+      <article class="topic" id="sec-audit">
+        <h3>Логирование и базовый аудит</h3>
+        <p class="summary">Что ловить и где смотреть: <code>log_connections</code>, <code>log_statement</code>, расширение <code>pgaudit</code>.</p>
+        <div class="code-block">
+          <pre># postgresql.conf
+log_connections = on
+log_disconnections = on
+log_hostname = on
+log_statement = 'ddl'           # 'all' тяжело и шумно
+log_min_duration_statement = 200ms
+log_line_prefix = '%t [%p] %u@%d app=%a '
+
+-- pgaudit (расширение): тонкая настройка по классам и объектам.
+CREATE EXTENSION IF NOT EXISTS pgaudit;
+-- В postgresql.conf:
+-- shared_preload_libraries = 'pgaudit'
+-- pgaudit.log = 'ddl, role, write'
+
+-- Кто что менял в правах — в журнале, плюс через pg_event_trigger:
+SELECT * FROM pg_stat_activity WHERE state = 'active';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sec-audit">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>log_statement = 'all'</code> на проде — это много гигабайт логов и потенциальная утечка PII; обычно ограничиваются <code>'ddl'</code> + медленными запросами.</li>
+            <li><code>pgaudit</code> даёт классы (<code>READ</code>, <code>WRITE</code>, <code>FUNCTION</code>, <code>ROLE</code>, <code>DDL</code>) и объектный аудит. Хорошо логируется в SIEM.</li>
+            <li>Для real-time реакции — <code>EVENT TRIGGER</code> (срабатывает на DDL).</li>
+            <li>Бэкапы и логи храни в другом доступе, чем сама БД, иначе компрометация одного снимает аудит.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Связанные темы</h2>
+      <article class="topic concept">
+        <h3>Где ещё про безопасность</h3>
+        <div class="desc">
+          <ul>
+            <li><a href="senior.html#sr-rls">Row-Level Security</a> — политики доступа к строкам.</li>
+            <li><a href="senior.html#sr-security-definer">SECURITY DEFINER</a> — функции, выполняющиеся с правами владельца.</li>
+            <li><a href="programming.html#raise-using">RAISE … USING</a> — не клади секреты в текст ошибки.</li>
+            <li><a href="programming.html#dynamic-sql">Динамический SQL</a> — про защиту от SQL injection.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>
