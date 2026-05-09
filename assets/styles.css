@@ -752,6 +752,64 @@ h1.page-title {
   transition: outline-color 1.2s;
 }
 
+/* ===== Прогресс-трекинг ===== */
+.progress-controls {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+.progress-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.progress-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.sidebar-progress {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.sidebar-progress .sp-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sidebar-progress .sp-row + .sp-bar {
+  margin-bottom: 8px;
+}
+.sidebar-progress .sp-num { color: var(--text-dim); }
+.sidebar-progress .sp-bar {
+  height: 5px;
+  background: var(--bg-code);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.sidebar-progress .sp-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s;
+}
+.sidebar-progress .sp-fill.practiced {
+  background: var(--success);
+}
+
 /* ===== Упражнения ===== */
 .exercises-section {
   margin: var(--space-7) 0 var(--space-4);

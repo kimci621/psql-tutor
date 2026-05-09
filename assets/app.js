@@ -1,8 +1,9 @@
 import { highlightSQL } from "./sql-highlight.js?v=2";
 import { initChat } from "./chat.js?v=6";
 import { loadTheme, saveTheme } from "./settings.js";
-import { findTrackContext, resolveHref } from "./tracks.js?v=1";
+import { findTrackContext, resolveHref, tracks } from "./tracks.js?v=2";
 import { initExercises } from "./exercises.js?v=1";
+import { initProgressControls, initSidebarProgress } from "./progress.js?v=1";
 
 function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
@@ -258,5 +259,24 @@ document.addEventListener("DOMContentLoaded", () => {
   initTrackNavigation();
   initTopicAnchors();
   initExercises();
+  initProgressTracking();
   initChat();
 });
+
+function initProgressTracking() {
+  const here = currentPagePath();
+  // чекбоксы только если страница есть в каком-то треке
+  if (findTrackContext(here)) {
+    initProgressControls(here);
+  }
+  // сайдбар-прогресс показываем всегда; собираем список всех страниц треков
+  const all = [];
+  const seen = new Set();
+  for (const t of tracks) {
+    for (const p of t.pages) {
+      const norm = p.href.replace(/^\.\//, "").replace(/^\//, "");
+      if (!seen.has(norm)) { seen.add(norm); all.push(norm); }
+    }
+  }
+  initSidebarProgress(all);
+}
