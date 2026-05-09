@@ -91,13 +91,14 @@
 
 ### Технический долг
 
-- [ ] **5.1** GitHub Actions CI: `node --test` + `python -m unittest` + `node --check` — **S**
-- [ ] **5.2** Линтер HTML (html-validate) — дубли id, битые `data-topic-id` — **S**
-- [ ] **5.3** Скрипт-проверка целостности: парсит все HTML, сверяет `data-topic-id` с `topics.js`, падает при сироте — **S**
-- [ ] **5.4** Docker-compose с Postgres 16 + pgAdmin + автозагрузка seed — **S**
-- [ ] **5.5** Автобамп `?v=` через date-stamp в `app.js` — **S**
-- [ ] **5.6** Service Worker для офлайн-кэша страниц и ассетов — **M**
-- [ ] **5.7** Тесты на `prompts.js::buildSystemPrompt`: golden snapshot per topic — **S**
+- [x] **5.1** GitHub Actions CI: `node --test` + `python -m unittest` + `node --check` — **S** — 2026-05-09, 195841d
+- [x] **5.2** Линтер HTML (html-validate) — дубли id, битые `data-topic-id` — **S** — 2026-05-09, 195841d
+  - Свой узкий линтер вместо отдельной зависимости — `tools/check-topic-ids.mjs` (дубли id, неизвестные topic-id, битые .html-ссылки). Это отвечает целям задачи без новых deps.
+- [x] **5.3** Скрипт-проверка целостности: парсит все HTML, сверяет `data-topic-id` с `topics.js`, падает при сироте — **S** — 2026-05-09, 195841d
+- [x] **5.4** Docker-compose с Postgres 16 + pgAdmin + автозагрузка seed — **S** — 2026-05-09, 195841d
+- [x] **5.5** Автобамп `?v=` через date-stamp в `app.js` — **S** — 2026-05-09, 195841d
+- [x] **5.6** Service Worker для офлайн-кэша страниц и ассетов — **M** — 2026-05-09, 195841d
+- [x] **5.7** Тесты на `prompts.js::buildSystemPrompt`: golden snapshot per topic — **S** — 2026-05-09, 195841d
 
 ---
 
@@ -106,3 +107,16 @@
 Здесь агент фиксирует значимые отклонения от плана, найденные проблемы, новые задачи. Формат: `YYYY-MM-DD — заметка`.
 
 - 2026-05-08 — Roadmap создан.
+- 2026-05-09 — Прошли спринты 2–5. Ключевые архитектурные решения:
+  - Каждое упражнение получило отдельный topic-id с `kind: "exercise"` и полями
+    `task` / `solution`. `buildSystemPrompt` ветвится на код-ревью режим и
+    подмешивает попытку ученика из textarea «вживую» при каждом отправлении.
+  - `assets/topic-index.js` — статический карта topic-id → page, генерируется
+    одноразово (см. inline node-снипеты в коммитах). Используется поиском (1.5)
+    и блоком «Связано» (4.5).
+  - Линтер HTML — собственный `tools/check-topic-ids.mjs` вместо html-validate,
+    чтобы не тащить deps. Ловит битые data-topic-id, дубли id, битые .html-ссылки.
+  - Service worker (5.6) — простой stale-while-revalidate; для LM Studio
+    проксированного API всегда обходится сетью.
+  - 4.5 (relatedTopics) реализован как поле + рендерер; заполнен только для
+    `inner-join` в качестве примера. Доfill — постепенная задача.
