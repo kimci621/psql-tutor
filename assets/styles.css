@@ -880,6 +880,26 @@ h1.page-title {
   background: var(--accent-soft);
 }
 
+/* ===== Деревья решений ===== */
+ul.decision-tree {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+ul.decision-tree li {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--accent);
+  background: var(--bg-elev);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+ul.decision-tree li strong { color: var(--text); }
+
 /* ===== ER-диаграмма ===== */
 .er-figure {
   margin: var(--space-4) 0;

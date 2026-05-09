@@ -2400,6 +2400,43 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  // ===== decisions.html =====
+  "dec-index": {
+    title: "Какой индекс выбрать",
+    summary: "Дерево решений для подбора индекса под запрос.",
+    examples: [],
+    pitfalls: ["Композитный индекс работает по leftmost prefix", "GIN/jsonb_path_ops — только для @>"],
+    learningGoals: ["сопоставлять запрос и тип индекса"]
+  },
+  "dec-isolation": {
+    title: "Какой уровень изоляции выбрать",
+    summary: "READ COMMITTED / REPEATABLE READ / SERIALIZABLE.",
+    examples: [],
+    pitfalls: ["SERIALIZABLE может бросать 40001 — приложение должно ретраить", "Lost update лечится FOR UPDATE, а не более высоким уровнем"],
+    learningGoals: ["выбирать минимально достаточный уровень"]
+  },
+  "dec-id-type": {
+    title: "Какой тип ID для PK",
+    summary: "bigint identity vs UUID v4 vs UUID v7.",
+    examples: [],
+    pitfalls: ["UUID v4 рассыпает индекс случайно — медленнее вставки", "money тип в Postgres — антипаттерн"],
+    learningGoals: ["выбирать ID под видимость и распределённость"]
+  },
+  "dec-partition-shard": {
+    title: "Партиционирование vs шардинг",
+    summary: "Когда хватит partition, а когда нужен шардинг.",
+    examples: [],
+    pitfalls: ["Шардинг — дорого; индексы и партиции часто решают", "PARTITION BY RANGE/LIST помогает с DROP старых данных"],
+    learningGoals: ["оценивать масштабы перед шардингом"]
+  },
+  "dec-money-types": {
+    title: "Какой тип для денег",
+    summary: "numeric vs bigint в копейках vs money vs float.",
+    examples: ["numeric(12, 2) NOT NULL CHECK (price >= 0)"],
+    pitfalls: ["float — approximate, нельзя для финансовых расчётов", "money зависит от lc_monetary"],
+    learningGoals: ["хранить деньги без сюрпризов"]
+  },
+
   // ===== copy.html =====
   "copy-formats": {
     title: "Форматы COPY: TEXT, CSV, BINARY",
