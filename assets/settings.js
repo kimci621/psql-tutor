@@ -34,9 +34,28 @@ export function saveSettings(s) {
   localStorage.setItem(KEY, JSON.stringify(s));
 }
 
+// Тема. Если пользователь не выбирал явно — берём системную через
+// prefers-color-scheme. Явный выбор сохраняется в localStorage.
 export function loadTheme() {
-  return localStorage.getItem("psql-tutor:theme") || "dark";
+  const explicit = localStorage.getItem("psql-tutor:theme");
+  if (explicit === "dark" || explicit === "light") return explicit;
+  if (typeof window !== "undefined" && window.matchMedia) {
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+  return "dark";
 }
 export function saveTheme(t) {
   localStorage.setItem("psql-tutor:theme", t);
+}
+// Подписка на смену системной темы — вызывает callback с новой темой.
+// Действует только пока пользователь не сделал явный выбор.
+export function watchSystemTheme(cb) {
+  if (typeof window === "undefined" || !window.matchMedia) return;
+  const mq = window.matchMedia("(prefers-color-scheme: light)");
+  const handler = () => {
+    if (localStorage.getItem("psql-tutor:theme")) return; // явный выбор — не трогаем
+    cb(mq.matches ? "light" : "dark");
+  };
+  if (mq.addEventListener) mq.addEventListener("change", handler);
+  else if (mq.addListener)  mq.addListener(handler);
 }
