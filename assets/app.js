@@ -1,5 +1,5 @@
 import { highlightSQL } from "./sql-highlight.js?v=2";
-import { initChat } from "./chat.js?v=6";
+import { initChat } from "./chat.js?v=7";
 import { loadTheme, saveTheme, watchSystemTheme } from "./settings.js";
 import { findTrackContext, resolveHref, tracks } from "./tracks.js?v=2";
 import { initExercises } from "./exercises.js?v=1";
@@ -256,6 +256,12 @@ function injectChatPanel() {
       <button class="btn icon" id="chatReset" title="Сбросить диалог" aria-label="Сбросить диалог"><span aria-hidden="true">↺</span></button>
       <button class="btn icon" id="chatClose" title="Закрыть" aria-label="Закрыть чат"><span aria-hidden="true">✕</span></button>
     </div>
+  </div>
+  <div class="chat-modes" role="toolbar" aria-label="Режимы чата">
+    <button class="btn" data-chat-mode="explain"  type="button">Объясни</button>
+    <button class="btn" data-chat-mode="quiz-me"  type="button">Спроси меня</button>
+    <button class="btn" data-chat-mode="check-sql" type="button">Проверь мой SQL</button>
+    <button class="btn" data-chat-mode="give-task" type="button">Дай задачу</button>
   </div>
   <div id="chatBody" class="chat-body"></div>
   <div class="chat-foot">

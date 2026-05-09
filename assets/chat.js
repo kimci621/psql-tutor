@@ -44,6 +44,19 @@ export function initChat() {
   stopBtn.addEventListener("click", stopStream);
   resetBtn.addEventListener("click", resetDialog);
   document.getElementById("chatExport").addEventListener("click", exportDialog);
+
+  // Кнопки режимов чата (3.2): шлют видимое user-сообщение, которое
+  // переключает модель в соответствующий формат ответа.
+  document.querySelectorAll("[data-chat-mode]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!state.topic || state.busy) return;
+      const mode = btn.dataset.chatMode;
+      const text = chatModeMessage(mode, state.topic);
+      if (!text) return;
+      sendMessage(text, false);
+    });
+  });
+
   taEl.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -203,6 +216,22 @@ async function sendMessage(text, hidden) {
       state.history.push({ role: "assistant", content: acc });
       saveHistory();
     }
+  }
+}
+
+function chatModeMessage(mode, topic) {
+  const t = topic.title;
+  switch (mode) {
+    case "explain":
+      return `Объясни тему "${t}" заново — короткое определение, зачем нужно, один SQL-пример отдельным fenced code block, разбор по частям. В конце один проверочный вопрос.`;
+    case "quiz-me":
+      return `Спроси меня сейчас один короткий проверочный вопрос по теме "${t}". Не давай ответ — жди мою попытку.`;
+    case "check-sql":
+      return `Я хочу прислать свой SQL по теме "${t}". Попроси меня вставить запрос и опиши, что именно ты будешь проверять (синтаксис, логика, индексы, NULL, JOIN, изоляция — что применимо к теме).`;
+    case "give-task":
+      return `Дай мне практическую задачу по теме "${t}" на учебных таблицах users / products / orders / order_items. Сначала только условие — без решения. Я попробую сам, потом разберём.`;
+    default:
+      return null;
   }
 }
 

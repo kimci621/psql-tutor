@@ -347,6 +347,18 @@ h1.page-title {
   margin-top: var(--space-1);
 }
 .chat-actions { display: flex; gap: var(--space-1); }
+.chat-modes {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-wrap: wrap;
+}
+.chat-modes .btn {
+  font-size: 12px;
+  padding: 4px 10px;
+}
 .chat-body {
   flex: 1;
   overflow-y: auto;
