@@ -29,6 +29,7 @@ export const tracks = [
     estimate: '2–4 недели',
     pages: [
       { href: 'transactions.html', title: 'Транзакции и блокировки' },
+      { href: 'window.html', title: 'Оконные функции' },
       { href: 'indexes.html', title: 'Индексы' },
       { href: 'guides/create-index.html', title: 'Гайд: создание индекса' },
       { href: 'guides/vacuum.html', title: 'Гайд: VACUUM' },

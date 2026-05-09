@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Оконные функции — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=16"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="cheatsheet.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="window.html">Оконные функции</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="security.html">Безопасность</a></li>
+      <li><a href="tuning.html">Конфигурация и тюнинг</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Оконные функции</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Оконные функции (window functions)</h1>
+    <p class="page-lead">
+      То, что обычная агрегация не умеет: считать что-то «по группе», но при этом не схлопывать строки.
+      Здесь и running totals, и top-N per group, и dedupe — всё на одной странице, на учебном датасете.
+    </p>
+
+    <section class="category">
+      <h2>1. Что такое окно</h2>
+
+      <article class="topic concept" id="win-intro">
+        <h3>OVER (...) — окно для каждой строки</h3>
+        <p class="summary">Агрегат + <code>OVER</code> = считаем по группе, но возвращаем строки.</p>
+        <div class="code-block">
+          <pre>-- сумма всех заказов рядом с каждым заказом:
+SELECT id, user_id, total,
+       sum(total) OVER () AS total_overall
+FROM   orders;
+
+-- та же сумма, но отдельно для каждого пользователя:
+SELECT id, user_id, total,
+       sum(total) OVER (PARTITION BY user_id) AS total_user
+FROM   orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-intro">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Окно — это набор строк, на котором функция работает <em>для текущей строки</em>. Без <code>OVER</code> агрегат схлопывает группу, с <code>OVER</code> — нет.</p>
+          <p><code>PARTITION BY</code> разбивает на группы. <code>ORDER BY</code> внутри окна задаёт порядок, по которому считается running aggregate (см. ниже).</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. Frames: ROWS / RANGE / GROUPS</h2>
+
+      <article class="topic" id="win-frames">
+        <h3>Кадр окна — что включается в расчёт</h3>
+        <p class="summary">Без явного frame по умолчанию — <code>RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</code> (если есть ORDER BY) или вся партиция (если нет).</p>
+        <div class="code-block">
+          <pre>-- ROWS: считает по физическим строкам
+SELECT id, total,
+       sum(total) OVER (
+         ORDER BY id
+         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+       ) AS rolling_3
+FROM   orders;
+
+-- RANGE: считает по значению ORDER BY (ловит дубли вместе)
+SELECT created_at::date AS day, total,
+       sum(total) OVER (
+         ORDER BY created_at::date
+         RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW
+       ) AS sum_last_7d
+FROM   orders;
+
+-- GROUPS (PG 11+): кадр в «пачках» одинаковых ORDER BY значений
+SELECT user_id, created_at::date, total,
+       sum(total) OVER (
+         PARTITION BY user_id
+         ORDER BY created_at::date
+         GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW
+       ) AS sum_today_and_yesterday
+FROM   orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-frames">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>ROWS</strong> — по строкам после сортировки. «Последние N строк».</li>
+            <li><strong>RANGE</strong> — по значению. Все строки с тем же ключом ORDER BY попадают в кадр вместе.</li>
+            <li><strong>GROUPS</strong> — по группам одинаковых ORDER BY значений (PG 11+).</li>
+            <li><code>PRECEDING</code>, <code>FOLLOWING</code>, <code>CURRENT ROW</code>, <code>UNBOUNDED PRECEDING/FOLLOWING</code> — границы кадра.</li>
+            <li>Дефолтный кадр в большинстве случаев работает «не как ожидаешь» — задавай явно.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. LAG, LEAD, FIRST_VALUE, LAST_VALUE</h2>
+
+      <article class="topic" id="win-lag-lead">
+        <h3>LAG / LEAD — соседние строки</h3>
+        <p class="summary">Заглянуть на N строк назад/вперёд внутри окна.</p>
+        <div class="code-block">
+          <pre>-- разница между текущей и предыдущей суммой по пользователю:
+SELECT user_id, id, total,
+       lag(total) OVER (PARTITION BY user_id ORDER BY created_at) AS prev_total,
+       total - lag(total) OVER (PARTITION BY user_id ORDER BY created_at) AS delta
+FROM   orders;
+
+-- следующий заказ:
+SELECT id, user_id, created_at,
+       lead(created_at) OVER (PARTITION BY user_id ORDER BY created_at) AS next_order_at
+FROM   orders;
+
+-- LAG с дефолтом, чтобы не было NULL:
+lag(total, 1, 0) OVER (...);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-lag-lead">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="win-first-last-value">
+        <h3>FIRST_VALUE / LAST_VALUE / NTH_VALUE</h3>
+        <p class="summary">Первая, последняя или N-я строка кадра — берегись дефолтного frame для LAST_VALUE.</p>
+        <div class="code-block">
+          <pre>-- первая покупка пользователя рядом с каждой:
+SELECT user_id, id, created_at,
+       first_value(id) OVER (
+         PARTITION BY user_id ORDER BY created_at
+         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+       ) AS first_order_id
+FROM   orders;
+
+-- частая ошибка с LAST_VALUE:
+SELECT user_id, id,
+       last_value(id) OVER (PARTITION BY user_id ORDER BY created_at) AS last_id
+FROM   orders;
+-- ↑ возвращает текущий id, а не последний — потому что дефолтный frame
+--   = RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW.
+-- Правильно — задать frame явно:
+last_value(id) OVER (
+  PARTITION BY user_id
+  ORDER BY created_at
+  ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+)</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-first-last-value">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Ранжирование</h2>
+
+      <article class="topic" id="win-ranking">
+        <h3>ROW_NUMBER / RANK / DENSE_RANK</h3>
+        <p class="summary">Три способа пронумеровать строки внутри окна.</p>
+        <div class="code-block">
+          <pre>SELECT user_id, id, total,
+       row_number() OVER (PARTITION BY user_id ORDER BY total DESC) AS rn,
+       rank()       OVER (PARTITION BY user_id ORDER BY total DESC) AS rk,
+       dense_rank() OVER (PARTITION BY user_id ORDER BY total DESC) AS drk
+FROM   orders;
+-- При двух одинаковых total:
+--   row_number: 1, 2, 3, 4    (всегда уникален)
+--   rank:       1, 2, 2, 4    (пропуски после ничьей)
+--   dense_rank: 1, 2, 2, 3    (без пропусков)</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-ranking">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Используй <code>row_number()</code>, когда нужна уникальность; <code>dense_rank()</code> — для рейтингов «без дыр»; <code>rank()</code> — для классических спортивных мест.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Паттерны</h2>
+
+      <article class="topic" id="win-running-total">
+        <h3>Running totals (нарастающий итог)</h3>
+        <p class="summary">Сумма с начала истории до текущей строки.</p>
+        <div class="code-block">
+          <pre>SELECT id, created_at, total,
+       sum(total) OVER (
+         ORDER BY created_at
+         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ) AS running_total
+FROM   orders;
+
+-- Отдельно для каждого пользователя:
+SELECT user_id, id, created_at, total,
+       sum(total) OVER (
+         PARTITION BY user_id
+         ORDER BY created_at
+         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ) AS user_running_total
+FROM   orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-running-total">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="win-top-n">
+        <h3>Top-N per group</h3>
+        <p class="summary">«Дай мне три самых дорогих заказа на каждого пользователя».</p>
+        <div class="code-block">
+          <pre>SELECT *
+FROM   (
+  SELECT user_id, id, total,
+         row_number() OVER (
+           PARTITION BY user_id
+           ORDER BY total DESC
+         ) AS rn
+  FROM   orders
+) AS t
+WHERE  rn &lt;= 3;
+
+-- Или более компактно через LATERAL:
+SELECT u.email, top.id, top.total
+FROM   users u
+JOIN   LATERAL (
+  SELECT id, total FROM orders o
+  WHERE o.user_id = u.id
+  ORDER BY total DESC
+  LIMIT 3
+) top ON true;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-top-n">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="win-dedupe">
+        <h3>Dedupe — оставить «последнюю» строку из дубликатов</h3>
+        <p class="summary">Почистить таблицу, оставив по одной строке на ключ.</p>
+        <div class="code-block">
+          <pre>-- Найти дубли:
+SELECT email, count(*)
+FROM   users
+GROUP  BY email
+HAVING count(*) &gt; 1;
+
+-- Оставить только самую свежую запись по email (если случилось дублирование):
+WITH ranked AS (
+  SELECT id, email,
+         row_number() OVER (
+           PARTITION BY lower(email)
+           ORDER BY created_at DESC, id DESC
+         ) AS rn
+  FROM   users
+)
+DELETE FROM users u
+USING  ranked r
+WHERE  u.id = r.id
+  AND  r.rn &gt; 1;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-dedupe">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Перед боевым прогоном — обязательно <code>SELECT</code>-вариант с тем же CTE и просмотр глазами. Удаление по window-функции — мощная штука, но необратимая.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="win-named">
+        <h3>Именованные окна (WINDOW)</h3>
+        <p class="summary">Один <code>WINDOW</code> — несколько функций над тем же кадром, без копипасты.</p>
+        <div class="code-block">
+          <pre>SELECT user_id, id, total, created_at,
+       sum(total)         OVER w AS running_total,
+       row_number()       OVER w AS rn,
+       lag(total)         OVER w AS prev_total
+FROM   orders
+WINDOW w AS (
+  PARTITION BY user_id
+  ORDER BY created_at
+  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="win-named">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Связанные темы</h2>
+      <article class="topic concept">
+        <h3>Где ещё</h3>
+        <div class="desc">
+          <ul>
+            <li><a href="aggregates.html">Агрегации и GROUP BY</a> — обычные агрегаты без OVER.</li>
+            <li><a href="indexes.html#composite-index">Композитные индексы</a> — на колонки в PARTITION BY / ORDER BY.</li>
+            <li><a href="cheatsheet.html#cte">CTE и WITH</a> — часто используются вместе.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>

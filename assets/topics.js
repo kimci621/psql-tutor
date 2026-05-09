@@ -2400,6 +2400,107 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  // ===== window.html =====
+  "win-intro": {
+    title: "OVER — окно для каждой строки",
+    summary: "Агрегат + OVER = считаем по группе, но не схлопываем строки.",
+    examples: [
+      "SELECT id, total, sum(total) OVER (PARTITION BY user_id) FROM orders;"
+    ],
+    pitfalls: [
+      "Без OVER агрегат схлопывает строки",
+      "PARTITION BY делит на группы, ORDER BY — задаёт порядок внутри"
+    ],
+    learningGoals: ["отличать обычные агрегаты от оконных"]
+  },
+  "win-frames": {
+    title: "Кадры окна: ROWS / RANGE / GROUPS",
+    summary: "Что попадает в кадр расчёта функции.",
+    examples: [
+      "ROWS BETWEEN 2 PRECEDING AND CURRENT ROW",
+      "RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW",
+      "GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW"
+    ],
+    pitfalls: [
+      "Дефолтный кадр часто работает не так, как ожидаешь — задавай явно",
+      "RANGE объединяет строки с одинаковым ключом ORDER BY",
+      "GROUPS появился в PG 11"
+    ],
+    learningGoals: ["задавать кадр точно", "выбирать тип под задачу"]
+  },
+  "win-lag-lead": {
+    title: "LAG / LEAD",
+    summary: "Заглянуть на N строк назад/вперёд.",
+    examples: [
+      "lag(total) OVER (PARTITION BY user_id ORDER BY created_at)",
+      "lead(created_at) OVER (...)"
+    ],
+    pitfalls: [
+      "lag без offset — это lag(col, 1)",
+      "lag(col, 1, default) — третий аргумент защищает от NULL"
+    ],
+    learningGoals: ["считать дельты", "находить gaps между событиями"]
+  },
+  "win-first-last-value": {
+    title: "FIRST_VALUE / LAST_VALUE / NTH_VALUE",
+    summary: "Первая / последняя / N-я строка кадра.",
+    examples: [
+      "first_value(id) OVER (PARTITION BY user_id ORDER BY created_at ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)"
+    ],
+    pitfalls: [
+      "LAST_VALUE с дефолтным RANGE возвращает текущую строку, а не последнюю — нужен явный frame UNBOUNDED ... UNBOUNDED"
+    ],
+    learningGoals: ["задавать симметричный frame для last_value"]
+  },
+  "win-ranking": {
+    title: "ROW_NUMBER / RANK / DENSE_RANK",
+    summary: "Три способа пронумеровать строки внутри окна.",
+    examples: [
+      "row_number() OVER (PARTITION BY user_id ORDER BY total DESC)"
+    ],
+    pitfalls: [
+      "row_number — всегда уникален; rank — пропуски после ничьих; dense_rank — без пропусков"
+    ],
+    learningGoals: ["выбирать правильный тип нумерации"]
+  },
+  "win-running-total": {
+    title: "Running totals",
+    summary: "Нарастающий итог, нарастающее число событий.",
+    examples: [
+      "sum(total) OVER (PARTITION BY user_id ORDER BY created_at ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)"
+    ],
+    pitfalls: ["Без явного frame можно получить «весь partition» вместо нарастающего итога"],
+    learningGoals: ["писать классический running total"]
+  },
+  "win-top-n": {
+    title: "Top-N per group",
+    summary: "Дай мне 3 лучших заказа на каждого пользователя.",
+    examples: [
+      "SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY user_id ORDER BY total DESC) rn FROM orders) WHERE rn <= 3;",
+      "SELECT u.email, t.* FROM users u JOIN LATERAL (SELECT id FROM orders o WHERE o.user_id = u.id ORDER BY total DESC LIMIT 3) t ON true;"
+    ],
+    pitfalls: ["LATERAL часто эффективнее window-функции на огромных таблицах"],
+    learningGoals: ["писать top-N через row_number и через LATERAL"]
+  },
+  "win-dedupe": {
+    title: "Dedupe — оставить одну строку из дубликатов",
+    summary: "Удалить дубли, сохранив самую свежую.",
+    examples: [
+      "WITH ranked AS (SELECT id, row_number() OVER (PARTITION BY lower(email) ORDER BY created_at DESC) rn FROM users)\nDELETE FROM users u USING ranked r WHERE u.id = r.id AND r.rn > 1;"
+    ],
+    pitfalls: ["Перед DELETE — обязательно SELECT-проверка с тем же CTE"],
+    learningGoals: ["безопасно чистить дубли"]
+  },
+  "win-named": {
+    title: "Именованные окна (WINDOW)",
+    summary: "Один WINDOW — несколько функций над тем же кадром.",
+    examples: [
+      "SELECT sum(total) OVER w, row_number() OVER w FROM orders WINDOW w AS (PARTITION BY user_id ORDER BY created_at);"
+    ],
+    pitfalls: ["Без именованного окна одинаковая спецификация в нескольких местах — копипаста"],
+    learningGoals: ["использовать WINDOW для DRY"]
+  },
+
   // ===== Расширенная репликация =====
   "sr-physical-vs-logical": {
     title: "Физическая vs логическая репликация",
