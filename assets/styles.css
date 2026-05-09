@@ -752,6 +752,59 @@ h1.page-title {
   transition: outline-color 1.2s;
 }
 
+/* ===== Оглавление страницы (TOC) ===== */
+.page-toc {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  width: 220px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  font-size: 13px;
+  display: none;
+  z-index: 5;
+}
+@media (min-width: 1280px) {
+  .page-toc { display: block; }
+}
+.page-toc .toc-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2);
+}
+.page-toc ul.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.page-toc ul.toc-list a {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  line-height: 1.35;
+}
+.page-toc ul.toc-list a:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.page-toc ul.toc-list a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
 /* ===== Поиск (Cmd/Ctrl+K) ===== */
 .search-overlay {
   position: fixed;

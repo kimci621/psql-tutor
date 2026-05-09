@@ -5,6 +5,7 @@ import { findTrackContext, resolveHref, tracks } from "./tracks.js?v=2";
 import { initExercises } from "./exercises.js?v=1";
 import { initProgressControls, initSidebarProgress } from "./progress.js?v=1";
 import { initSearch } from "./search.js?v=1";
+import { initTOC } from "./toc.js?v=1";
 
 function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
@@ -262,6 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initExercises();
   initProgressTracking();
   initSearch();
+  initTOC();
   initChat();
 });
 
