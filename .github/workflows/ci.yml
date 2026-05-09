@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Syntax-check JS modules
+        run: |
+          for f in assets/*.js; do node --check "$f"; done
+
+      - name: Run JS unit tests
+        run: node --test tests/*.mjs
+
+      - name: Run Python proxy tests
+        run: python3 tests/server_proxy.test.py
+
+      - name: Topic-id integrity check
+        run: node tools/check-topic-ids.mjs

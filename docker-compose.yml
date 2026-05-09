@@ -1,0 +1,50 @@
+# Локальная учебная связка: Postgres 16 + pgAdmin + автозагрузка seed.
+#
+# Запуск:   docker compose up -d
+# Стоп:     docker compose down       (с -v — снести данные)
+# Postgres: localhost:5432  (user: postgres, password: postgres, db: psql_tutor)
+# pgAdmin:  http://localhost:5050     (admin@example.com / admin)
+#
+# Файлы из ./examples/ автоматически применяются при первой инициализации
+# (механизм /docker-entrypoint-initdb.d из официального образа postgres).
+
+services:
+  db:
+    image: postgres:16
+    container_name: psql-tutor-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: psql_tutor
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Каждый .sql из examples/ применяется в алфавитном порядке.
+      # Имена 01-, 02- задают порядок: schema → seed.
+      - ./examples/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./examples/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d psql_tutor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: psql-tutor-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+
+volumes:
+  pgdata:
+  pgadmin:

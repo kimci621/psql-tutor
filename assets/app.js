@@ -349,6 +349,16 @@ function injectChatPanel() {
   while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
 }
 
+// 5.6: регистрация service worker для офлайн-кэша.
+// Регистрируем только при загрузке через http(s) — на file:// SW не работает.
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      // Молча: на dev-сервере без поддержки SW это нормально.
+    });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   injectChatPanel();
   initTheme();
