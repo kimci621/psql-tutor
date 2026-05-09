@@ -34,3 +34,37 @@ test("initial hidden user message includes selected topic title", () => {
     'Объясни тему "Подключение через psql" по учебному шаблону. Начни с объяснения, покажи пример отдельным fenced code block, затем задай один проверочный вопрос.',
   );
 });
+
+const exerciseTopic = {
+  kind: "exercise",
+  title: "Упражнение: первые SELECT и WHERE",
+  task: "Выбери активных пользователей",
+  solution: "SELECT * FROM users WHERE is_active",
+  solutionNote: "не забывай про NULL",
+  pitfalls: ["сравнение с NULL"],
+  learningGoals: ["WHERE с NULL"],
+};
+
+test("exercise system prompt switches to code-review mode and embeds task + solution", () => {
+  const prompt = buildSystemPrompt(exerciseTopic);
+  assert.match(prompt, /Режим — КОД-РЕВЬЮ/);
+  assert.match(prompt, /Условие задачи:/);
+  assert.match(prompt, /Выбери активных пользователей/);
+  assert.match(prompt, /Эталонное решение/);
+  assert.match(prompt, /SELECT \* FROM users WHERE is_active/);
+  assert.match(prompt, /ученик ещё не написал свой запрос/);
+});
+
+test("exercise system prompt embeds the student's attempt when provided", () => {
+  const prompt = buildSystemPrompt(exerciseTopic, { exerciseAttempt: "select id from users" });
+  assert.match(prompt, /ПОПЫТКА УЧЕНИКА \(как есть/);
+  assert.match(prompt, /select id from users/);
+  assert.doesNotMatch(prompt, /ученик ещё не написал свой запрос/);
+});
+
+test("exercise initial user message differs based on attempt", () => {
+  const noAttempt = buildInitialUserMessage(exerciseTopic);
+  assert.match(noAttempt, /Я ещё не писал запрос/);
+  const withAttempt = buildInitialUserMessage(exerciseTopic, { exerciseAttempt: "select 1" });
+  assert.match(withAttempt, /Я уже написал попытку/);
+});

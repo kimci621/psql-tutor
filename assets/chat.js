@@ -1,8 +1,9 @@
 import { topics } from "./topics.js";
-import { buildInitialUserMessage, buildSystemPrompt } from "./prompts.js?v=3";
+import { buildInitialUserMessage, buildSystemPrompt } from "./prompts.js?v=4";
 import { streamChat, listModels } from "./llm-client.js";
 import { defaults, loadSettings, saveSettings } from "./settings.js";
 import { renderMarkdown } from "./md.js?v=2";
+import { getExerciseAttempt } from "./exercises.js?v=1";
 
 const HISTORY_PREFIX = "psql-tutor:chat:";
 const state = {
@@ -29,6 +30,9 @@ export function initChat() {
   document.querySelectorAll("[data-topic-id]").forEach(btn => {
     btn.addEventListener("click", () => openChat(btn.dataset.topicId));
   });
+
+  // Свежая попытка из textarea упражнения подхватывается на каждый send.
+  // Здесь же — реакция на смену темы (state.topicId меняется при openChat).
 
   document.getElementById("chatClose").addEventListener("click", closeChat);
   scrimEl.addEventListener("click", closeChat);
@@ -69,9 +73,18 @@ function openChat(topicId) {
   setTimeout(() => taEl.focus(), 200);
 
   if (state.history.length === 0) {
-    // Первый запуск темы — попросим ИИ сначала объяснить выбранную тему.
-    sendMessage(buildInitialUserMessage(state.topic), /*hidden*/ true);
+    // Первый запуск темы — попросим ИИ сначала объяснить выбранную тему
+    // (или разобрать упражнение, если это exercise-тема).
+    const initOpts = currentExerciseOpts();
+    sendMessage(buildInitialUserMessage(state.topic, initOpts), /*hidden*/ true);
   }
+}
+
+// Опции, передаваемые в prompts.js: для упражнений — попытка ученика.
+// Берём textarea «вживую», чтобы новая попытка попадала в следующий send.
+function currentExerciseOpts() {
+  if (!state.topic || state.topic.kind !== "exercise") return {};
+  return { exerciseAttempt: getExerciseAttempt(state.topicId) };
 }
 
 function closeChat() {
@@ -150,7 +163,7 @@ async function sendMessage(text, hidden) {
 
   const settings = loadSettings();
   const messages = [
-    { role: "system", content: buildSystemPrompt(state.topic) },
+    { role: "system", content: buildSystemPrompt(state.topic, currentExerciseOpts()) },
     ...state.history.map(m => ({ role: m.role, content: m.content })),
   ];
 
@@ -238,8 +251,8 @@ function resetDialog() {
   state.history = [];
   saveHistory();
   bodyEl.innerHTML = "";
-  // снова попросим ИИ сначала объяснить тему
-  sendMessage(buildInitialUserMessage(state.topic), true);
+  // снова попросим ИИ сначала объяснить тему / разобрать упражнение
+  sendMessage(buildInitialUserMessage(state.topic, currentExerciseOpts()), true);
 }
 
 // ===== Settings modal =====
