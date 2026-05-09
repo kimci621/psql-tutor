@@ -2400,6 +2400,62 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  // ===== Расширенная репликация =====
+  "sr-physical-vs-logical": {
+    title: "Физическая vs логическая репликация",
+    summary: "Что копируется, ограничения, типичные применения.",
+    examples: [
+      "CREATE PUBLICATION app_pub FOR TABLE users, orders;\nCREATE SUBSCRIPTION app_sub CONNECTION '...' PUBLICATION app_pub;"
+    ],
+    pitfalls: [
+      "Логическая не передаёт DDL — миграции вручную с обеих сторон",
+      "Физическая требует совпадения мажорной версии и архитектуры",
+      "Логическая поверх физической — для неё нужен wal_level = logical и slot"
+    ],
+    learningGoals: ["выбирать тип под задачу", "понимать ограничения каждой"]
+  },
+  "sr-sync-async": {
+    title: "Синхронная vs асинхронная репликация",
+    summary: "synchronous_commit и synchronous_standby_names.",
+    examples: [
+      "synchronous_standby_names = 'ANY 1 (replica1, replica2)'",
+      "SET LOCAL synchronous_commit = local;"
+    ],
+    pitfalls: [
+      "Async — возможна потеря последних транзакций при крэше",
+      "Sync без живой реплики — primary встаёт",
+      "remote_apply дороже всего, но даёт read-after-write на реплике"
+    ],
+    learningGoals: ["понимать уровни synchronous_commit", "разделять чувствительные и нет транзакции"]
+  },
+  "sr-replication-slots": {
+    title: "Replication slots, wal_keep_size",
+    summary: "Гарантия сохранения WAL для подписчика.",
+    examples: [
+      "SELECT pg_create_physical_replication_slot('replica1');",
+      "SELECT slot_name, slot_type, active, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal FROM pg_replication_slots;"
+    ],
+    pitfalls: [
+      "Заброшенный слот пухнет и забивает диск",
+      "max_slot_wal_keep_size — обязательная защита",
+      "wal_keep_size заменил wal_keep_segments с PG 13"
+    ],
+    learningGoals: ["управлять слотами", "следить за объёмом WAL"]
+  },
+  "sr-failover": {
+    title: "Failover и оркестрация",
+    summary: "Patroni, pg_auto_failover, repmgr — что делает каждый.",
+    examples: [
+      "patronictl -c patroni.yml list\npatronictl -c patroni.yml switchover"
+    ],
+    pitfalls: [
+      "Patroni требует DCS (etcd / Consul / ZooKeeper)",
+      "pg_rewind дешевле, чем basebackup, для возврата старого primary",
+      "Switchover — управляемый, failover — аварийный"
+    ],
+    learningGoals: ["понимать роль оркестратора", "выбирать решение под инфраструктуру"]
+  },
+
   // ===== Расширенные бэкапы =====
   "sr-pgdump-formats": {
     title: "pg_dump / pg_dumpall: форматы",
