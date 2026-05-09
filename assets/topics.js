@@ -2400,6 +2400,19 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  "explain-before-after": {
+    title: "EXPLAIN до и после индекса",
+    summary: "Сравнение Seq Scan и Index Scan на одном запросе.",
+    examples: [
+      "EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM orders WHERE user_id = 1;"
+    ],
+    pitfalls: [
+      "Rows Removed by Filter — признак, что индекс не задействован",
+      "Buffers shared hit/read важнее «времени»: время плавает между прогонами"
+    ],
+    learningGoals: ["читать актуальные строки плана", "видеть эффект индекса"]
+  },
+
   // ===== decisions.html =====
   "dec-index": {
     title: "Какой индекс выбрать",

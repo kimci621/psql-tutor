@@ -119,6 +119,7 @@ export const topicPageIndex = {
   "ex-indexes-pick": "indexes.html",
   "ex-indexes-partial": "indexes.html",
   "ex-indexes-functional": "indexes.html",
+  "explain-before-after": "indexes.html",
   "copy-formats": "copy.html",
   "copy-stdin": "copy.html",
   "copy-tuning": "copy.html",

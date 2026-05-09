@@ -359,6 +359,60 @@ GROUP  BY user_id;</pre>
       </article>
     </section>
 
+    <section class="category">
+      <h2>Визуализация EXPLAIN: до и после</h2>
+      <article class="topic" id="explain-before-after">
+        <h3>Один и тот же запрос: с индексом и без</h3>
+        <p class="summary">Простой пример, показывающий, как меняется план после добавления индекса.</p>
+        <div class="code-block">
+          <pre>-- ДО:
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE user_id = 1;
+--                                                      QUERY PLAN
+-- Seq Scan on orders  (cost=0.00..1948.00 rows=14 width=64)
+--                     (actual time=0.012..12.480 rows=3 loops=1)
+--   Filter: (user_id = 1)
+--   Rows Removed by Filter: 99997
+--   Buffers: shared hit=948 read=0
+-- Planning Time: 0.080 ms
+-- Execution Time: 12.502 ms
+
+-- Создаём индекс:
+CREATE INDEX idx_orders_user_id ON orders (user_id);
+
+-- ПОСЛЕ:
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE user_id = 1;
+--                                                      QUERY PLAN
+-- Index Scan using idx_orders_user_id on orders
+--   (cost=0.42..8.45 rows=14 width=64)
+--   (actual time=0.025..0.038 rows=3 loops=1)
+--   Index Cond: (user_id = 1)
+--   Buffers: shared hit=4
+-- Planning Time: 0.094 ms
+-- Execution Time: 0.052 ms</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="explain-before-after">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Цена</strong> упала с 1948.00 (Seq Scan) до 8.45 (Index Scan).</li>
+            <li><strong>Buffers</strong>: 948 страниц → 4 страницы. Это самая частая метрика проверки эффекта.</li>
+            <li><strong>Время выполнения</strong>: 12.5 мс → 0.05 мс на 100k строк.</li>
+            <li><strong>Rows Removed by Filter</strong> — индикатор «индекс не задействован»: эти строки пришлось читать и выкидывать.</li>
+          </ul>
+          <p>Чтобы наглядно видеть план целиком — вставь вывод <code>EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)</code> в одну из визуализаций:</p>
+          <ul>
+            <li><a href="https://explain.dalibo.com/" target="_blank" rel="noopener">explain.dalibo.com</a> — древовидный план с временами и подсветкой узких мест.</li>
+            <li><a href="https://explain.depesz.com/" target="_blank" rel="noopener">explain.depesz.com</a> — табличный вид, удобно искать «горячие» узлы.</li>
+            <li><a href="https://tatiyants.com/pev/" target="_blank" rel="noopener">tatiyants pev</a> — графический редактор плана.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
     <section class="quiz" data-quiz-id="indexes">
       <h2>Мини-тест по индексам</h2>
       <ol class="quiz-questions">
