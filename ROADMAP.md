@@ -64,7 +64,7 @@
 
 - [x] **2.7** Углубить репликацию: sync vs async, физическая vs логическая, replication slots, `wal_keep_size`, обзор failover (Patroni/pg_auto_failover) — **M** — 2026-05-09, ac373c2
 - [x] **2.9** Отдельная страница оконных функций: frames (`ROWS`/`RANGE`/`GROUPS`), `LAG/LEAD`, `FIRST_VALUE`, паттерны (running totals, dedupe, top-N per group) — **M** — 2026-05-09, 70eae52
-- [ ] **2.10** Углубить JSONB: `jsonb_ops` vs `jsonb_path_ops`, `jsonb_path_query`, `@@` JSONPath, индексы по выражению — **S**
+- [x] **2.10** Углубить JSONB: `jsonb_ops` vs `jsonb_path_ops`, `jsonb_path_query`, `@@` JSONPath, индексы по выражению — **S** — 2026-05-09, f83006c
 - [ ] **2.11** Страница `COPY`/массовая загрузка: форматы, тюнинг, `COPY … FROM PROGRAM`, сравнение с `pg_dump`, параллельный restore — **S**
 
 ### AI-ментор
