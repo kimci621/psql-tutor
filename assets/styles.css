@@ -880,6 +880,58 @@ h1.page-title {
   background: var(--accent-soft);
 }
 
+/* ===== ER-диаграмма ===== */
+.er-figure {
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.er-figure svg.er-diagram {
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  color: var(--text-muted);
+}
+.er-diagram .er-table {
+  fill: var(--bg-card);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+.er-diagram .er-th {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--accent);
+}
+.er-diagram .er-col {
+  font-family: var(--mono);
+  font-size: 12px;
+  fill: var(--text-dim);
+}
+.er-diagram .er-pk {
+  font-weight: 700;
+  fill: var(--text);
+}
+.er-diagram .er-edge {
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+  fill: none;
+}
+.er-diagram .er-edge-label {
+  font-family: var(--sans);
+  font-size: 11px;
+  fill: var(--text-muted);
+}
+.er-diagram .er-sep { stroke: var(--border); }
+.er-figure figcaption {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
 /* ===== Поиск (Cmd/Ctrl+K) ===== */
 .search-overlay {
   position: fixed;

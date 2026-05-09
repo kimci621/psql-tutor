@@ -105,6 +105,59 @@
     <section class="category" id="dataset">
       <h2>Учебный датасет</h2>
       <p class="sub">Все примеры в учебнике используют один сквозной набор таблиц: <code>users</code>, <code>products</code>, <code>orders</code>, <code>order_items</code>. Скачай SQL-файлы и загрузи их в свою локальную БД — так будет удобнее повторять примеры и решать упражнения.</p>
+      <figure class="er-figure">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 380" class="er-diagram" role="img" aria-label="ER-диаграмма учебной схемы">
+  <defs>
+    <marker id="erArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+  </defs>
+  <g transform="translate(20,40)">
+    <rect class="er-table" width="180" height="140" rx="6"/>
+    <text class="er-th" x="14" y="22">users</text>
+    <line x1="0" y1="32" x2="180" y2="32" class="er-sep" />
+    <text class="er-col er-pk" x="14" y="54">id (PK)</text>
+    <text class="er-col" x="14" y="72">email UNIQUE</text>
+    <text class="er-col" x="14" y="90">full_name</text>
+    <text class="er-col" x="14" y="108">is_active</text>
+    <text class="er-col" x="14" y="126">created_at</text>
+  </g>
+  <g transform="translate(280,40)">
+    <rect class="er-table" width="180" height="140" rx="6"/>
+    <text class="er-th" x="14" y="22">orders</text>
+    <line x1="0" y1="32" x2="180" y2="32" class="er-sep" />
+    <text class="er-col er-pk" x="14" y="54">id (PK)</text>
+    <text class="er-col" x="14" y="72">user_id (FK)</text>
+    <text class="er-col" x="14" y="90">status</text>
+    <text class="er-col" x="14" y="108">total</text>
+    <text class="er-col" x="14" y="126">created_at</text>
+  </g>
+  <g transform="translate(540,200)">
+    <rect class="er-table" width="160" height="140" rx="6"/>
+    <text class="er-th" x="14" y="22">products</text>
+    <line x1="0" y1="32" x2="160" y2="32" class="er-sep" />
+    <text class="er-col er-pk" x="14" y="54">id (PK)</text>
+    <text class="er-col" x="14" y="72">sku UNIQUE</text>
+    <text class="er-col" x="14" y="90">name</text>
+    <text class="er-col" x="14" y="108">category</text>
+    <text class="er-col" x="14" y="126">price</text>
+  </g>
+  <g transform="translate(280,200)">
+    <rect class="er-table" width="200" height="140" rx="6"/>
+    <text class="er-th" x="14" y="22">order_items</text>
+    <line x1="0" y1="32" x2="200" y2="32" class="er-sep" />
+    <text class="er-col er-pk" x="14" y="54">order_id (PK,FK)</text>
+    <text class="er-col er-pk" x="14" y="72">product_id (PK,FK)</text>
+    <text class="er-col" x="14" y="90">quantity</text>
+    <text class="er-col" x="14" y="108">unit_price</text>
+  </g>
+  <path class="er-edge" d="M200,110 L280,110" marker-end="url(#erArrow)"/>
+  <text class="er-edge-label" x="210" y="103">1..N</text>
+  <path class="er-edge" d="M370,180 L370,200" marker-end="url(#erArrow)"/>
+  <text class="er-edge-label" x="376" y="195">1..N</text>
+  <path class="er-edge" d="M480,260 L540,260" marker-end="url(#erArrow)"/>
+  <text class="er-edge-label" x="490" y="253">N..1</text>
+</svg>
+        <figcaption>Связи: <code>users 1—N orders</code>, <code>orders 1—N order_items N—1 products</code>.</figcaption>
+      </figure>
       <div class="topic">
         <h3>Как загрузить</h3>
         <ol>
