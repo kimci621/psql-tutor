@@ -62,6 +62,49 @@ function initCodeBlocks() {
   });
 }
 
+function initMobileSidebar() {
+  const sidebar = document.querySelector(".sidebar");
+  const topbar = document.querySelector(".topbar");
+  if (!sidebar || !topbar) return;
+  if (topbar.querySelector(".mobile-menu-btn")) return;
+
+  const btn = document.createElement("button");
+  btn.className = "mobile-menu-btn";
+  btn.setAttribute("aria-label", "Открыть меню");
+  btn.setAttribute("aria-expanded", "false");
+  btn.innerHTML = '<span aria-hidden="true">☰</span>';
+  topbar.insertBefore(btn, topbar.firstChild);
+
+  function close() {
+    sidebar.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("click", outsideClose, true);
+    document.removeEventListener("keydown", escClose);
+  }
+  function open() {
+    sidebar.classList.add("open");
+    btn.setAttribute("aria-expanded", "true");
+    setTimeout(() => document.addEventListener("click", outsideClose, true), 0);
+    document.addEventListener("keydown", escClose);
+  }
+  function outsideClose(e) {
+    if (sidebar.contains(e.target) || btn.contains(e.target)) return;
+    close();
+  }
+  function escClose(e) {
+    if (e.key === "Escape") close();
+  }
+
+  btn.addEventListener("click", () => {
+    if (sidebar.classList.contains("open")) close(); else open();
+  });
+
+  // Закрываем при переходе по ссылке навигации.
+  sidebar.querySelectorAll(".nav a").forEach(a => {
+    a.addEventListener("click", () => close());
+  });
+}
+
 function initActiveNav() {
   const here = location.pathname.split("/").pop() || "index.html";
   document.querySelectorAll(".nav a").forEach(a => {
@@ -258,6 +301,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   initCodeBlocks();
   initActiveNav();
+  initMobileSidebar();
   initTrackNavigation();
   initTopicAnchors();
   initExercises();
