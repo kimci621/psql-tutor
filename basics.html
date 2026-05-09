@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Основы PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=14"></script>
+<script type="module" src="assets/app.js?v=15"></script>
 </head>
 <body>
 <div class="layout">
@@ -439,6 +439,57 @@ FROM   users;</pre>
           <p class="ex-note"><code>FILTER (WHERE …)</code> — стандартный способ условной агрегации в PostgreSQL. Альтернатива: <code>sum(CASE WHEN … THEN 1 ELSE 0 END)</code>.</p>
         </div>
       </article>
+    </section>
+
+    <section class="quiz" data-quiz-id="basics">
+      <h2>Мини-тест по основам</h2>
+      <ol class="quiz-questions">
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">Что вернёт запрос <code>SELECT NULL = NULL;</code>?</p>
+          <label><input type="radio" name="bq1" value="a"> TRUE</label>
+          <label><input type="radio" name="bq1" value="b"> NULL</label>
+          <label><input type="radio" name="bq1" value="c"> FALSE</label>
+          <label><input type="radio" name="bq1" value="d"> Ошибку</label>
+          <p class="quiz-explain" hidden>NULL означает «неизвестно». Сравнение неизвестного с неизвестным — тоже неизвестно. Используй <code>IS NULL</code> / <code>IS NOT NULL</code>.</p>
+        </li>
+        <li class="quiz-q" data-correct="c">
+          <p class="quiz-text">Какая категория SQL у команды <code>GRANT SELECT ON t TO readonly;</code>?</p>
+          <label><input type="radio" name="bq2" value="a"> DDL</label>
+          <label><input type="radio" name="bq2" value="b"> DML</label>
+          <label><input type="radio" name="bq2" value="c"> DCL</label>
+          <label><input type="radio" name="bq2" value="d"> TCL</label>
+          <p class="quiz-explain" hidden>DCL (Data Control Language) — это <code>GRANT</code> и <code>REVOKE</code>.</p>
+        </li>
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">В Postgres команды на бэкслеше (<code>\dt</code>, <code>\c</code>) — это…</p>
+          <label><input type="radio" name="bq3" value="a"> часть стандартного SQL</label>
+          <label><input type="radio" name="bq3" value="b"> мета-команды утилиты psql</label>
+          <label><input type="radio" name="bq3" value="c"> расширение PostgreSQL</label>
+          <label><input type="radio" name="bq3" value="d"> синоним SELECT</label>
+          <p class="quiz-explain" hidden>Это команды клиента <code>psql</code>; на стороне сервера их не существует.</p>
+        </li>
+        <li class="quiz-q" data-correct="d">
+          <p class="quiz-text">Какой результат у <code>SELECT coalesce(NULL, NULL, 'аноним');</code>?</p>
+          <label><input type="radio" name="bq4" value="a"> NULL</label>
+          <label><input type="radio" name="bq4" value="b"> ''</label>
+          <label><input type="radio" name="bq4" value="c"> Ошибку</label>
+          <label><input type="radio" name="bq4" value="d"> 'аноним'</label>
+          <p class="quiz-explain" hidden><code>coalesce</code> возвращает первый аргумент, не равный NULL. Если все NULL — последний (NULL). Здесь последний — строка.</p>
+        </li>
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">В каком порядке логически вычисляются части <code>SELECT</code>?</p>
+          <label><input type="radio" name="bq5" value="a"> SELECT → WHERE → GROUP BY → ORDER BY</label>
+          <label><input type="radio" name="bq5" value="b"> FROM → WHERE → GROUP BY → SELECT → ORDER BY</label>
+          <label><input type="radio" name="bq5" value="c"> WHERE → SELECT → GROUP BY → FROM</label>
+          <label><input type="radio" name="bq5" value="d"> SELECT → GROUP BY → WHERE → FROM</label>
+          <p class="quiz-explain" hidden>Логически: <code>FROM</code> → <code>WHERE</code> → <code>GROUP BY</code> → <code>HAVING</code> → <code>SELECT</code> → <code>ORDER BY</code> → <code>LIMIT</code>. Поэтому алиасы из SELECT доступны в ORDER BY, но не в WHERE.</p>
+        </li>
+      </ol>
+      <div class="quiz-actions">
+        <button class="btn primary quiz-check" type="button">Проверить</button>
+        <button class="btn quiz-reset" type="button">Сбросить</button>
+      </div>
+      <p class="quiz-result" hidden></p>
     </section>
   </main>
 </div>

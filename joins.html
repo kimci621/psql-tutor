@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Соединения таблиц — PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=14"></script>
+<script type="module" src="assets/app.js?v=15"></script>
 </head>
 <body>
 <div class="layout">
@@ -399,6 +399,57 @@ LIMIT  3;</pre>
           <p class="ex-note">В GROUP BY должны быть все не-агрегированные поля SELECT. Для уникальности достаточно <code>u.id</code>, но <code>u.email</code> тоже разрешён (функционально зависит от PK).</p>
         </div>
       </article>
+    </section>
+
+    <section class="quiz" data-quiz-id="joins">
+      <h2>Мини-тест по JOIN-ам</h2>
+      <ol class="quiz-questions">
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text"><code>JOIN</code> без префикса — это какой тип соединения?</p>
+          <label><input type="radio" name="jq1" value="a"> LEFT OUTER</label>
+          <label><input type="radio" name="jq1" value="b"> INNER</label>
+          <label><input type="radio" name="jq1" value="c"> CROSS</label>
+          <label><input type="radio" name="jq1" value="d"> FULL OUTER</label>
+          <p class="quiz-explain" hidden>По умолчанию <code>JOIN</code> = <code>INNER JOIN</code>.</p>
+        </li>
+        <li class="quiz-q" data-correct="c">
+          <p class="quiz-text">Условие <code>o.total &gt; 0</code> попало в <code>WHERE</code> после <code>LEFT JOIN</code>. Что произойдёт?</p>
+          <label><input type="radio" name="jq2" value="a"> Ничего, LEFT остаётся LEFT.</label>
+          <label><input type="radio" name="jq2" value="b"> Запрос упадёт с ошибкой.</label>
+          <label><input type="radio" name="jq2" value="c"> Превратится в INNER (исчезнут строки без совпадения).</label>
+          <label><input type="radio" name="jq2" value="d"> Условие проигнорируется.</label>
+          <p class="quiz-explain" hidden>Условие из правой таблицы в WHERE отсекает строки с NULL. Чтобы сохранить LEFT — клади условие в ON.</p>
+        </li>
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">Какой запрос корректно находит пользователей <em>без</em> заказов?</p>
+          <label><input type="radio" name="jq3" value="a"> <code>SELECT * FROM users WHERE id NOT IN (SELECT user_id FROM orders);</code></label>
+          <label><input type="radio" name="jq3" value="b"> <code>SELECT * FROM users u WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);</code></label>
+          <label><input type="radio" name="jq3" value="c"> <code>SELECT * FROM users u JOIN orders o ON o.user_id = u.id WHERE o.id IS NULL;</code></label>
+          <label><input type="radio" name="jq3" value="d"> <code>SELECT * FROM users u WHERE u.id != ANY (SELECT user_id FROM orders);</code></label>
+          <p class="quiz-explain" hidden><code>NOT EXISTS</code> и <code>LEFT JOIN … IS NULL</code> работают всегда; <code>NOT IN</code> ломается, если правый набор содержит NULL. Вариант (c) — это INNER JOIN, и в нём строк с <code>o.id IS NULL</code> по определению нет.</p>
+        </li>
+        <li class="quiz-q" data-correct="d">
+          <p class="quiz-text">Когда полезен <code>FULL OUTER JOIN</code>?</p>
+          <label><input type="radio" name="jq4" value="a"> Чтобы быстрее работал INNER.</label>
+          <label><input type="radio" name="jq4" value="b"> Для подсчёта количества строк.</label>
+          <label><input type="radio" name="jq4" value="c"> Чтобы уменьшить количество JOIN-ов.</label>
+          <label><input type="radio" name="jq4" value="d"> Для сверки расхождений между двумя источниками.</label>
+          <p class="quiz-explain" hidden>FULL OUTER возвращает всё из обеих таблиц + NULL там, где совпадения нет — идеально для diff двух наборов.</p>
+        </li>
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">Что делает <code>NATURAL JOIN</code>?</p>
+          <label><input type="radio" name="jq5" value="a"> Вычисляет декартово произведение.</label>
+          <label><input type="radio" name="jq5" value="b"> Соединяет по столбцам с одинаковыми именами в обеих таблицах.</label>
+          <label><input type="radio" name="jq5" value="c"> Делает то же, что INNER, но быстрее.</label>
+          <label><input type="radio" name="jq5" value="d"> Вычисляет полу-соединение.</label>
+          <p class="quiz-explain" hidden>Неявно по всем одноимённым столбцам — отсюда хрупкость.</p>
+        </li>
+      </ol>
+      <div class="quiz-actions">
+        <button class="btn primary quiz-check" type="button">Проверить</button>
+        <button class="btn quiz-reset" type="button">Сбросить</button>
+      </div>
+      <p class="quiz-result" hidden></p>
     </section>
   </main>
 </div>

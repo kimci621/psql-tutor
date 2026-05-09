@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Индексы — PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=14"></script>
+<script type="module" src="assets/app.js?v=15"></script>
 </head>
 <body>
 <div class="layout">
@@ -354,6 +354,57 @@ GROUP  BY user_id;</pre>
           <p class="ex-note">Функциональный (выражение) индекс хранит результат выражения. Запрос обязан использовать ровно то же выражение — <code>lower(email)</code> — иначе индекс не подхватится.</p>
         </div>
       </article>
+    </section>
+
+    <section class="quiz" data-quiz-id="indexes">
+      <h2>Мини-тест по индексам</h2>
+      <ol class="quiz-questions">
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">В композитном индексе <code>(user_id, created_at)</code> запрос <code>WHERE created_at &gt;= now() - interval '7 days'</code> без условия по <code>user_id</code>…</p>
+          <label><input type="radio" name="iq1" value="a"> хорошо использует индекс</label>
+          <label><input type="radio" name="iq1" value="b"> почти не использует индекс — порядок столбцов не тот</label>
+          <label><input type="radio" name="iq1" value="c"> упадёт с ошибкой</label>
+          <label><input type="radio" name="iq1" value="d"> переключится на bitmap-сканирование</label>
+          <p class="quiz-explain" hidden>В composite-индексе ведущий столбец критичен. Без условия по <code>user_id</code> нужен либо отдельный индекс по <code>created_at</code>, либо seq scan.</p>
+        </li>
+        <li class="quiz-q" data-correct="c">
+          <p class="quiz-text">Запрос <code>SELECT * FROM users WHERE lower(email) = lower($1);</code> ускорит индекс…</p>
+          <label><input type="radio" name="iq2" value="a"> <code>CREATE INDEX ... ON users (email);</code></label>
+          <label><input type="radio" name="iq2" value="b"> <code>CREATE UNIQUE INDEX ... ON users (email);</code></label>
+          <label><input type="radio" name="iq2" value="c"> <code>CREATE INDEX ... ON users (lower(email));</code></label>
+          <label><input type="radio" name="iq2" value="d"> Никакой</label>
+          <p class="quiz-explain" hidden>Функциональный индекс по <code>lower(email)</code>: запрос обязан использовать ровно то же выражение.</p>
+        </li>
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">Что НЕЛЬЗЯ написать в условии частичного индекса?</p>
+          <label><input type="radio" name="iq3" value="a"> <code>WHERE status = 'active'</code></label>
+          <label><input type="radio" name="iq3" value="b"> <code>WHERE created_at &gt; now() - interval '1 day'</code></label>
+          <label><input type="radio" name="iq3" value="c"> <code>WHERE deleted_at IS NULL</code></label>
+          <label><input type="radio" name="iq3" value="d"> <code>WHERE total &gt; 0</code></label>
+          <p class="quiz-explain" hidden>В условии частичного индекса разрешены только IMMUTABLE выражения. <code>now()</code> — STABLE, не подходит.</p>
+        </li>
+        <li class="quiz-q" data-correct="d">
+          <p class="quiz-text">Какой тип индекса лучше всего подходит для <code>jsonb</code>-фильтров и массивов?</p>
+          <label><input type="radio" name="iq4" value="a"> B-tree</label>
+          <label><input type="radio" name="iq4" value="b"> Hash</label>
+          <label><input type="radio" name="iq4" value="c"> BRIN</label>
+          <label><input type="radio" name="iq4" value="d"> GIN</label>
+          <p class="quiz-explain" hidden>GIN — generalized inverted index — стандарт для составных значений: jsonb, массивы, full-text.</p>
+        </li>
+        <li class="quiz-q" data-correct="a">
+          <p class="quiz-text"><code>CREATE INDEX CONCURRENTLY</code> — это про…</p>
+          <label><input type="radio" name="iq5" value="a"> создание без долгой блокировки таблицы для записей</label>
+          <label><input type="radio" name="iq5" value="b"> параллельную обработку строк</label>
+          <label><input type="radio" name="iq5" value="c"> создание сразу нескольких индексов</label>
+          <label><input type="radio" name="iq5" value="d"> создание индекса в репликации</label>
+          <p class="quiz-explain" hidden>CONCURRENTLY не блокирует <code>INSERT/UPDATE/DELETE</code> на время создания. Дороже и медленнее обычного <code>CREATE INDEX</code>, но безопасно для прода.</p>
+        </li>
+      </ol>
+      <div class="quiz-actions">
+        <button class="btn primary quiz-check" type="button">Проверить</button>
+        <button class="btn quiz-reset" type="button">Сбросить</button>
+      </div>
+      <p class="quiz-result" hidden></p>
     </section>
   </main>
 </div>

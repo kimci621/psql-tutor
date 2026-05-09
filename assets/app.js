@@ -6,6 +6,7 @@ import { initExercises } from "./exercises.js?v=1";
 import { initProgressControls, initSidebarProgress } from "./progress.js?v=1";
 import { initSearch } from "./search.js?v=1";
 import { initTOC } from "./toc.js?v=1";
+import { initQuizzes } from "./quiz.js?v=1";
 
 function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
@@ -311,6 +312,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initProgressTracking();
   initSearch();
   initTOC();
+  initQuizzes(currentPagePath());
   initChat();
 });
 

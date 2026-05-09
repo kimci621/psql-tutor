@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Транзакции и изоляция — PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=14"></script>
+<script type="module" src="assets/app.js?v=15"></script>
 </head>
 <body>
 <div class="layout">
@@ -331,6 +331,57 @@ COMMIT;</pre>
           <p class="ex-note"><code>REPEATABLE READ</code> фиксирует снимок данных на момент начала транзакции — все запросы видят одну и ту же версию. <code>SERIALIZABLE</code> дал бы то же и плюс защиту от write skew, но он дороже и здесь не нужен.</p>
         </div>
       </article>
+    </section>
+
+    <section class="quiz" data-quiz-id="transactions">
+      <h2>Мини-тест по транзакциям</h2>
+      <ol class="quiz-questions">
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">Какой уровень изоляции — по умолчанию в PostgreSQL?</p>
+          <label><input type="radio" name="tq1" value="a"> READ UNCOMMITTED</label>
+          <label><input type="radio" name="tq1" value="b"> READ COMMITTED</label>
+          <label><input type="radio" name="tq1" value="c"> REPEATABLE READ</label>
+          <label><input type="radio" name="tq1" value="d"> SERIALIZABLE</label>
+          <p class="quiz-explain" hidden>READ COMMITTED — дефолт. READ UNCOMMITTED в Postgres ведёт себя как READ COMMITTED.</p>
+        </li>
+        <li class="quiz-q" data-correct="d">
+          <p class="quiz-text">Какая аномалия НЕВОЗМОЖНА в Postgres ни на одном уровне изоляции?</p>
+          <label><input type="radio" name="tq2" value="a"> Non-repeatable read</label>
+          <label><input type="radio" name="tq2" value="b"> Phantom read</label>
+          <label><input type="radio" name="tq2" value="c"> Lost update</label>
+          <label><input type="radio" name="tq2" value="d"> Dirty read</label>
+          <p class="quiz-explain" hidden>Postgres использует MVCC и никогда не показывает чужие незакоммиченные изменения.</p>
+        </li>
+        <li class="quiz-q" data-correct="c">
+          <p class="quiz-text">Что делает <code>SELECT ... FOR UPDATE</code>?</p>
+          <label><input type="radio" name="tq3" value="a"> сразу обновляет строку</label>
+          <label><input type="radio" name="tq3" value="b"> блокирует всю таблицу</label>
+          <label><input type="radio" name="tq3" value="c"> берёт row-level lock на читаемые строки до конца транзакции</label>
+          <label><input type="radio" name="tq3" value="d"> делает то же, что SELECT FOR SHARE</label>
+          <p class="quiz-explain" hidden>FOR UPDATE — exclusive row lock, держится до COMMIT/ROLLBACK. FOR SHARE — share lock, слабее.</p>
+        </li>
+        <li class="quiz-q" data-correct="b">
+          <p class="quiz-text">В каком случае нужен SAVEPOINT?</p>
+          <label><input type="radio" name="tq4" value="a"> чтобы ускорить транзакцию</label>
+          <label><input type="radio" name="tq4" value="b"> чтобы откатить часть транзакции, не отменяя всю</label>
+          <label><input type="radio" name="tq4" value="c"> чтобы сохранить промежуточные результаты на диск</label>
+          <label><input type="radio" name="tq4" value="d"> чтобы синхронизироваться с репликой</label>
+          <p class="quiz-explain" hidden>SAVEPOINT — точка частичного отката внутри одной транзакции (<code>ROLLBACK TO SAVEPOINT name;</code>).</p>
+        </li>
+        <li class="quiz-q" data-correct="a">
+          <p class="quiz-text">В Postgres DDL-команда (например, <code>CREATE TABLE</code>)…</p>
+          <label><input type="radio" name="tq5" value="a"> транзакционна — может быть откачена через ROLLBACK</label>
+          <label><input type="radio" name="tq5" value="b"> всегда автокоммитится сразу</label>
+          <label><input type="radio" name="tq5" value="c"> требует SUPERUSER</label>
+          <label><input type="radio" name="tq5" value="d"> возможна только в отдельной БД</label>
+          <p class="quiz-explain" hidden>Postgres — одна из немногих СУБД с транзакционным DDL. Это позволяет миграциям быть атомарными.</p>
+        </li>
+      </ol>
+      <div class="quiz-actions">
+        <button class="btn primary quiz-check" type="button">Проверить</button>
+        <button class="btn quiz-reset" type="button">Сбросить</button>
+      </div>
+      <p class="quiz-result" hidden></p>
     </section>
   </main>
 </div>
