@@ -2400,6 +2400,77 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  // ===== Расширения programming.html =====
+  "cursors": {
+    title: "Курсоры в PostgreSQL",
+    summary: "DECLARE/FETCH/CLOSE; когда нужны и когда не нужны.",
+    examples: [
+      "DECLARE c1 CURSOR FOR SELECT id, email FROM users WHERE is_active;\nFETCH 5 FROM c1;\nCLOSE c1;",
+      "FOR r IN SELECT id FROM users LOOP ... END LOOP;  -- сахар PL/pgSQL"
+    ],
+    pitfalls: [
+      "Серверный курсор живёт в транзакции; для жизни после COMMIT — WITH HOLD",
+      "Большинство драйверов умеют ленивое чтение без явного курсора (libpq single-row, JDBC fetchSize)",
+      "MOVE и FETCH не возвращают строки в один аккумулятор — это императивный обход"
+    ],
+    learningGoals: ["понимать, когда курсор реально нужен", "отличать DECLARE … CURSOR от FOR … IN"]
+  },
+  "dynamic-sql": {
+    title: "Динамический SQL: EXECUTE",
+    summary: "EXECUTE + format() для безопасной сборки запросов с переменными именами объектов.",
+    examples: [
+      "EXECUTE format('SELECT count(*) FROM %s', tbl) INTO n;",
+      "EXECUTE 'SELECT * FROM users WHERE email = $1' INTO u USING addr;"
+    ],
+    pitfalls: [
+      "Идентификаторы — через format(%I) или regclass; не через конкатенацию",
+      "Значения — через USING, не через format(%L) и не через ||",
+      "Конкатенация пользовательского ввода в SQL — классический injection"
+    ],
+    learningGoals: ["писать безопасный динамический SQL", "разделять идентификаторы и значения"]
+  },
+  "sqlstate": {
+    title: "Классы ошибок (SQLSTATE)",
+    summary: "5-символьные коды ошибок, имена условий, ловля в EXCEPTION WHEN.",
+    examples: [
+      "EXCEPTION\n  WHEN unique_violation THEN\n    SELECT id INTO uid FROM users WHERE email = lower(email_in);\n    RETURN uid;",
+      "-- 23505 unique_violation, 40001 serialization_failure, 40P01 deadlock_detected"
+    ],
+    pitfalls: [
+      "WHEN OTHERS THEN съедает диагностику — используй редко и обязательно RAISE дальше",
+      "Блок с EXCEPTION — это неявный SAVEPOINT, его постоянное использование дорого",
+      "P0001 — это RAISE EXCEPTION без указания SQLSTATE"
+    ],
+    learningGoals: ["понимать классы 22/23/40/42", "выбирать имя условия, а не код"]
+  },
+  "raise-using": {
+    title: "Кастомные ошибки: RAISE … USING",
+    summary: "Свой текст, свой SQLSTATE, поля HINT/DETAIL/COLUMN/TABLE.",
+    examples: [
+      "RAISE EXCEPTION 'amount must be positive: %', amt\n  USING ERRCODE = 'invalid_parameter_value',\n        HINT    = 'передавай число > 0',\n        DETAIL  = format('from=%s to=%s', from_id, to_id);"
+    ],
+    pitfalls: [
+      "Не клади секреты в текст — он попадёт в логи",
+      "ERRCODE можно задавать именем ('invalid_parameter_value') или 5-символьным кодом",
+      "RAISE без аргументов внутри EXCEPTION — перевыбросить текущую ошибку"
+    ],
+    learningGoals: ["писать осмысленные ошибки", "пользоваться полями HINT/DETAIL"]
+  },
+  "returns-table-setof": {
+    title: "RETURNS TABLE vs SETOF",
+    summary: "Способы описать форму результата функции, возвращающей набор строк.",
+    examples: [
+      "CREATE FUNCTION active_users() RETURNS SETOF users LANGUAGE sql AS $$\n  SELECT * FROM users WHERE is_active;\n$$;",
+      "CREATE FUNCTION user_summary()\nRETURNS TABLE (id bigint, email text, orders_count bigint)\nLANGUAGE sql AS $$ ... $$;"
+    ],
+    pitfalls: [
+      "RETURNS SETOF record без описания требует AS t(...) при каждом вызове",
+      "RETURNS TABLE — это сахар над OUT-параметрами + SETOF record",
+      "Меняя тип таблицы, ты можешь сломать все RETURNS SETOF этой таблицы"
+    ],
+    learningGoals: ["выбирать форму результата сознательно", "понимать связь TABLE и OUT"]
+  },
+
   // ===== Упражнения =====
   // Каждое упражнение — отдельная "тема" для чата. Стартовый prompt
   // обогащается условием задачи и попыткой ученика (см. chat.js / prompts.js).

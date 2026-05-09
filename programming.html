@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Программирование внутри PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=8"></script>
+<script type="module" src="assets/app.js?v=9"></script>
 </head>
 <body>
 <div class="layout">
@@ -187,7 +187,243 @@ EXECUTE FUNCTION audit_orders_change();</pre>
     </section>
 
     <section class="category">
-      <h2>4. Связанные темы</h2>
+      <h2>4. Курсоры</h2>
+
+      <article class="topic" id="cursors">
+        <h3>Курсоры: проход по большому результату</h3>
+        <p class="summary">Когда не нужно держать миллион строк в памяти сразу. <code>DECLARE … FETCH … CLOSE</code>.</p>
+        <div class="code-block">
+          <pre>-- Курсор внутри транзакции (psql):
+BEGIN;
+
+DECLARE c1 CURSOR FOR
+  SELECT id, email
+  FROM   users
+  WHERE  is_active
+  ORDER  BY id;
+
+FETCH 5 FROM c1;        -- получить 5 строк
+FETCH NEXT FROM c1;     -- ещё одну
+MOVE FORWARD 100 IN c1; -- пропустить 100
+
+CLOSE c1;
+COMMIT;
+
+-- В PL/pgSQL — синтаксический сахар FOR … IN:
+CREATE OR REPLACE PROCEDURE recount_orders()
+LANGUAGE plpgsql AS $$
+DECLARE
+  r record;
+  total numeric;
+BEGIN
+  FOR r IN SELECT id FROM users WHERE is_active LOOP
+    SELECT sum(o.total) INTO total
+    FROM   orders o WHERE o.user_id = r.id;
+    -- ... что-то делаем
+  END LOOP;
+END $$;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cursors">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Серверный курсор живёт в рамках транзакции. Объявляй <code>WITH HOLD</code>, чтобы пережить COMMIT. Для большинства задач хватает обычного <code>SELECT</code>: драйверы и так читают результат лениво (libpq single-row mode, JDBC <code>setFetchSize</code>).</p>
+          <p>Курсор полезен, когда обработка строки запускает побочные действия (HTTP, запись в файл) и тянуть всё в память нельзя.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Динамический SQL: EXECUTE</h2>
+
+      <article class="topic" id="dynamic-sql">
+        <h3>EXECUTE и format()</h3>
+        <p class="summary">Когда имя таблицы или столбца неизвестно заранее. Параметры — через <code>USING</code>, идентификаторы — через <code>format(%I)</code>.</p>
+        <div class="code-block">
+          <pre>CREATE OR REPLACE FUNCTION row_count(tbl regclass)
+RETURNS bigint
+LANGUAGE plpgsql AS $$
+DECLARE
+  n bigint;
+BEGIN
+  -- Параметры подставляем безопасно через USING:
+  EXECUTE format('SELECT count(*) FROM %s', tbl)
+  INTO n;
+  RETURN n;
+END $$;
+
+SELECT row_count('public.users');
+
+-- Параметры значений идут через USING, не через format(%L)
+-- (так EXECUTE их параметризует, как обычный prepared statement):
+CREATE OR REPLACE FUNCTION find_by_email(addr text)
+RETURNS users
+LANGUAGE plpgsql AS $$
+DECLARE
+  u users;
+BEGIN
+  EXECUTE 'SELECT * FROM users WHERE lower(email) = lower($1)'
+  INTO u
+  USING addr;
+  RETURN u;
+END $$;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="dynamic-sql">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><strong>Идентификаторы</strong> (имена таблиц, столбцов) не параметризуются — для них используем <code>format()</code> с <code>%I</code> (квотирует, как идентификатор) или тип <code>regclass</code>, который сам валидирует имя.</p>
+          <p><strong>Значения</strong> подставляй через <code>USING</code> — это безопасно (никаких SQL-injection) и кешируется планировщиком.</p>
+          <p><strong>Не делай так:</strong> <code>EXECUTE 'SELECT * FROM users WHERE email = ''' || addr || ''''</code> — это инъекция.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Исключения и SQLSTATE</h2>
+
+      <article class="topic" id="sqlstate">
+        <h3>Классы ошибок (SQLSTATE) и условные обработчики</h3>
+        <p class="summary">Каждая ошибка Postgres имеет 5-символьный код; в <code>EXCEPTION WHEN</code> можно ловить по имени класса.</p>
+        <div class="code-block">
+          <pre>-- Часто используемые имена условий (SQLSTATE → имя):
+--   23505  unique_violation
+--   23503  foreign_key_violation
+--   23502  not_null_violation
+--   23514  check_violation
+--   22P02  invalid_text_representation
+--   40001  serialization_failure
+--   40P01  deadlock_detected
+--   P0001  raise_exception (наш RAISE без указания SQLSTATE)
+
+CREATE OR REPLACE FUNCTION safe_register(email_in text)
+RETURNS bigint
+LANGUAGE plpgsql AS $$
+DECLARE
+  uid bigint;
+BEGIN
+  INSERT INTO users(email)
+  VALUES (lower(email_in))
+  RETURNING id INTO uid;
+
+  RETURN uid;
+
+EXCEPTION
+  WHEN unique_violation THEN
+    SELECT id INTO uid FROM users WHERE email = lower(email_in);
+    RETURN uid;
+  WHEN check_violation THEN
+    RAISE NOTICE 'check failed для %', email_in;
+    RETURN NULL;
+END $$;
+
+-- Поймать любую ошибку (использовать редко — съедает диагностику):
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE;       -- лучше пробросить дальше</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sqlstate">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Полный список — в документации, глава «PostgreSQL Error Codes». Класс — первые две цифры: <code>23</code> — нарушение целостности, <code>40</code> — сбой транзакции, <code>22</code> — ошибка данных, <code>42</code> — синтаксис/семантика.</p>
+          <p>Любой блок с <code>EXCEPTION</code> — это неявный SAVEPOINT: при ловле ошибки откатывается часть транзакции до начала блока. Поэтому ловить ошибки в горячем коде дорого.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="raise-using">
+        <h3>Кастомные ошибки: RAISE … USING</h3>
+        <p class="summary">Свои сообщения, свои SQLSTATE, и аккуратный диагностический трейс.</p>
+        <div class="code-block">
+          <pre>CREATE OR REPLACE FUNCTION transfer(from_id bigint, to_id bigint, amt numeric)
+RETURNS void
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF amt &lt;= 0 THEN
+    RAISE EXCEPTION 'amount must be positive: %', amt
+      USING ERRCODE   = 'invalid_parameter_value',  -- = '22023'
+            HINT      = 'передавай число &gt; 0',
+            DETAIL    = format('from=%s to=%s amount=%s', from_id, to_id, amt),
+            COLUMN    = 'amount',
+            TABLE     = 'orders';
+  END IF;
+
+  -- ... перевод ...
+END $$;
+
+-- На стороне клиента (psql) увидишь:
+--   ERROR:  amount must be positive: -10
+--   DETAIL: from=1 to=2 amount=-10
+--   HINT:   передавай число &gt; 0
+--   SQLSTATE: 22023</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="raise-using">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Хорошие правила: <code>ERRCODE</code> — выбирай существующий из стандарта или свой класс <code>P0xxx</code>. <code>HINT</code> — что делать, чтобы ошибка не повторилась. <code>DETAIL</code> — машиночитаемые подробности. Не суй секреты в текст ошибки — он может уехать в логи.</p>
+          <p><code>RAISE</code> без аргументов внутри <code>EXCEPTION</code> просто перевыбрасывает текущую ошибку с её диагностикой.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>7. RETURNS TABLE vs SETOF</h2>
+
+      <article class="topic" id="returns-table-setof">
+        <h3>RETURNS TABLE(...) vs RETURNS SETOF</h3>
+        <p class="summary">Оба возвращают набор строк. Разница — в способе описания формы результата.</p>
+        <div class="code-block">
+          <pre>-- 1. RETURNS SETOF существующего типа (например, таблицы):
+CREATE OR REPLACE FUNCTION active_users()
+RETURNS SETOF users
+LANGUAGE sql AS $$
+  SELECT * FROM users WHERE is_active AND deleted_at IS NULL;
+$$;
+
+SELECT id, email FROM active_users();
+
+-- 2. RETURNS TABLE(...) — анонимный тип, удобно для вычисляемых полей:
+CREATE OR REPLACE FUNCTION user_summary()
+RETURNS TABLE (id bigint, email text, orders_count bigint, spent numeric)
+LANGUAGE sql AS $$
+  SELECT u.id, u.email,
+         count(o.id),
+         coalesce(sum(o.total) FILTER (WHERE o.status = 'delivered'), 0)
+  FROM   users u
+  LEFT JOIN orders o ON o.user_id = u.id
+  GROUP  BY u.id, u.email;
+$$;
+
+SELECT * FROM user_summary() WHERE spent &gt; 1000;
+
+-- 3. RETURNS SETOF record — без описания формы; нужно указывать его при вызове:
+CREATE OR REPLACE FUNCTION pivot_raw()
+RETURNS SETOF record
+LANGUAGE sql AS $$
+  SELECT category, count(*) FROM products GROUP BY 1;
+$$;
+
+SELECT * FROM pivot_raw() AS t(category text, n bigint);  -- иначе ошибка</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="returns-table-setof">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>RETURNS TABLE(...)</code> — это синтаксический сахар над <code>RETURNS SETOF record</code> + <code>OUT</code>-параметры; форма результата известна, и вызов <code>SELECT * FROM f()</code> работает без расширения.</p>
+          <p><code>RETURNS SETOF &lt;table&gt;</code> удобен, если функция отдаёт «обычные» строки таблицы — никакой переписи типа.</p>
+          <p><code>RETURNS SETOF record</code> без описания — последнее средство: придётся указывать колонки в каждом вызове, и оптимизатор почти ничего не знает о результате.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>8. Связанные темы</h2>
       <article class="topic concept">
         <h3>Где ещё</h3>
         <div class="desc">
