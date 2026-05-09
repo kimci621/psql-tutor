@@ -39,7 +39,7 @@
 
 ## Спринт 3 — Закрыть контентные пробелы
 
-- [ ] **2.4** Расширить `programming.html`: курсоры, динамический SQL (`EXECUTE`), классы исключений (`SQLSTATE`), кастомные ошибки (`RAISE … USING`), `RETURNS TABLE` vs `SETOF` — **M**
+- [x] **2.4** Расширить `programming.html`: курсоры, динамический SQL (`EXECUTE`), классы исключений (`SQLSTATE`), кастомные ошибки (`RAISE … USING`), `RETURNS TABLE` vs `SETOF` — **M** — 2026-05-09, bfc42e0
 - [ ] **2.5** Новая страница `security.html`: `pg_hba.conf`, SSL/TLS, `scram-sha-256`, иерархия ролей и `SET ROLE`, GRANT/REVOKE паттерны, аудит — **M**
 - [ ] **2.6** Углубить бэкапы (`sr-backup-pitr`): `pg_dump`/`pg_dumpall` форматы, `pg_restore -j`, `pgBackRest`/`WAL-G`, retention, чек-лист восстановления — **M**
 - [ ] **2.8** Новая страница: конфигурация и тюнинг (`shared_buffers`, `work_mem`, `effective_cache_size`, `checkpoint_*`, `autovacuum_*`, `max_connections` vs PgBouncer) — **M**
