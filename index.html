@@ -97,6 +97,35 @@
       </div>
     </section>
 
+    <section class="category" id="dataset">
+      <h2>Учебный датасет</h2>
+      <p class="sub">Все примеры в учебнике используют один сквозной набор таблиц: <code>users</code>, <code>products</code>, <code>orders</code>, <code>order_items</code>. Скачай SQL-файлы и загрузи их в свою локальную БД — так будет удобнее повторять примеры и решать упражнения.</p>
+      <div class="topic">
+        <h3>Как загрузить</h3>
+        <ol>
+          <li>Создай пустую БД (можно прямо в psql): <code>CREATE DATABASE psql_tutor;</code> и подключись: <code>\c psql_tutor</code>.</li>
+          <li>Скачай оба файла (ссылки ниже) и положи рядом с местом, откуда запускаешь psql.</li>
+          <li>Загрузи схему и данные:
+            <div class="code-block">
+              <pre>\i examples/schema.sql
+\i examples/seed.sql</pre>
+              <div class="code-actions">
+                <button class="btn btn-copy">📋 Копировать</button>
+              </div>
+            </div>
+          </li>
+          <li>Проверь, что всё на месте: <code>SELECT count(*) FROM users;</code> — должно быть 10.</li>
+        </ol>
+        <p style="margin-top: 12px;">
+          <a class="btn primary" href="examples/schema.sql" download>⤓ schema.sql</a>
+          <a class="btn primary" href="examples/seed.sql" download style="margin-left: 8px;">⤓ seed.sql</a>
+        </p>
+        <p style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">
+          Объём небольшой: 10 пользователей, 12 товаров, 13 заказов. Достаточно для практики JOIN, GROUP BY, оконных функций, индексов и EXPLAIN. Скрипты идемпотентны — можно перезапускать.
+        </p>
+      </div>
+    </section>
+
     <section class="category">
       <h2>Что ещё есть на сайте</h2>
       <p class="sub">Помимо треков — справочные материалы и гайды.</p>
