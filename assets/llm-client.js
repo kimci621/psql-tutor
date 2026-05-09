@@ -172,3 +172,18 @@ export async function listModels(baseUrl) {
   }
   return [];
 }
+
+// Пробует несколько кандидат-baseUrl в порядке предпочтения
+// и возвращает первый, на котором отвечает GET /models.
+// Возвращает { baseUrl, models } или null.
+export async function detectBaseUrl(candidates) {
+  for (const url of candidates) {
+    try {
+      const ids = await listModels(url);
+      return { baseUrl: url, models: ids };
+    } catch {
+      // try next
+    }
+  }
+  return null;
+}

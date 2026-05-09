@@ -1,6 +1,6 @@
 import { topics } from "./topics.js";
 import { buildInitialUserMessage, buildSystemPrompt } from "./prompts.js?v=4";
-import { streamChat, listModels } from "./llm-client.js";
+import { streamChat, listModels, detectBaseUrl } from "./llm-client.js";
 import { defaults, loadSettings, saveSettings } from "./settings.js";
 import { renderMarkdown } from "./md.js?v=2";
 import { getExerciseAttempt } from "./exercises.js?v=1";
@@ -65,6 +65,39 @@ export function initChat() {
   });
 
   initSettingsModal();
+  maybeFirstRunDetect();
+}
+
+// 3.9: при первом запуске пробуем автоматически найти живой LM Studio
+// по нескольким кандидатам. Если у пользователя уже выбрана модель —
+// ничего не делаем.
+const FIRST_RUN_DONE = "psql-tutor:first-run-detect";
+function maybeFirstRunDetect() {
+  try {
+    if (localStorage.getItem(FIRST_RUN_DONE)) return;
+  } catch { return; }
+
+  const cur = loadSettings();
+  if (cur.model) {
+    try { localStorage.setItem(FIRST_RUN_DONE, "1"); } catch {}
+    return;
+  }
+
+  const candidates = [
+    cur.baseUrl,
+    "/api/lmstudio/api/v1",
+    "/api/lmstudio/v1",
+    "http://127.0.0.1:1234/api/v1",
+    "http://127.0.0.1:1234/v1",
+  ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+  // Не блокируем UI; ловим тихо.
+  detectBaseUrl(candidates).then(found => {
+    try { localStorage.setItem(FIRST_RUN_DONE, "1"); } catch {}
+    if (!found || !found.models.length) return;
+    const next = { ...cur, baseUrl: found.baseUrl, model: found.models[0] };
+    saveSettings(next);
+  }).catch(() => {});
 }
 
 function openChat(topicId) {
@@ -133,6 +166,7 @@ function appendBubble(role, html, isStream) {
   div.dataset.role = role;
   if (role === "assistant") {
     div.innerHTML = renderMarkdown(html);
+    decorateCodeBlocks(div);
   } else {
     div.textContent = html;
   }
@@ -140,6 +174,36 @@ function appendBubble(role, html, isStream) {
   if (isStream) div.dataset.streaming = "1";
   scrollToBottom();
   return div;
+}
+
+// 3.4: добавляем кнопку «Копировать» к каждому <pre><code> в сообщении ИИ.
+function decorateCodeBlocks(root) {
+  root.querySelectorAll("pre").forEach(pre => {
+    if (pre.querySelector(".chat-code-copy")) return;
+    pre.style.position = "relative";
+    const btn = document.createElement("button");
+    btn.className = "btn chat-code-copy";
+    btn.type = "button";
+    btn.textContent = "Копировать";
+    btn.setAttribute("aria-label", "Копировать код");
+    btn.addEventListener("click", async () => {
+      const code = pre.querySelector("code");
+      const text = (code ? code.textContent : pre.textContent) || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "Скопировано ✓";
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch {}
+        document.body.removeChild(ta);
+        btn.textContent = "Скопировано";
+      }
+      setTimeout(() => { btn.textContent = "Копировать"; }, 1400);
+    });
+    pre.appendChild(btn);
+  });
 }
 
 function appendError(text) {
@@ -199,6 +263,7 @@ async function sendMessage(text, hidden) {
       acc += chunk;
       bubble.classList.remove("dots");
       bubble.innerHTML = renderMarkdown(acc);
+      decorateCodeBlocks(bubble);
       scrollToBottom();
     }
   } catch (e) {
@@ -206,7 +271,7 @@ async function sendMessage(text, hidden) {
       bubble.innerHTML = renderMarkdown(acc + "\n\n_(остановлено пользователем)_");
     } else {
       bubble.remove();
-      appendError(e.message || String(e));
+      appendError(friendlyNetworkError(e, settings));
       // откатим юзера, чтобы он мог переотправить
     }
   } finally {
@@ -217,6 +282,37 @@ async function sendMessage(text, hidden) {
       saveHistory();
     }
   }
+}
+
+// 3.8: понятное сообщение об ошибке сети / LM Studio.
+function friendlyNetworkError(e, settings) {
+  const msg = e && e.message ? String(e.message) : String(e);
+  const isNetwork =
+    e instanceof TypeError ||                     // fetch network errors
+    /Failed to fetch|NetworkError|ECONNREFUSED|fetch failed/i.test(msg);
+  const url = (settings && settings.baseUrl) || "";
+
+  if (isNetwork) {
+    const hints = [
+      "Не удалось дотянуться до LM Studio.",
+      `Проверь, что: 1) LM Studio открыт и Local Server запущен (Developer → Local Server → Start);`,
+      `2) у тебя загружена хотя бы одна модель;`,
+      `3) baseUrl в настройках указывает на доступный сервер. Сейчас: ${url || "—"}.`,
+    ];
+    if (!url.startsWith("/api/lmstudio")) {
+      hints.push(
+        "Если ловишь CORS, переключись на same-origin proxy: открой dev-сервер `python3 server.py` и поставь baseUrl `/api/lmstudio/api/v1`."
+      );
+    }
+    return hints.join(" ");
+  }
+  if (/HTTP 4\d\d/.test(msg)) {
+    return `LM Studio ответил клиентской ошибкой: ${msg}. Проверь модель и параметры в настройках.`;
+  }
+  if (/HTTP 5\d\d/.test(msg)) {
+    return `LM Studio упал на сервере: ${msg}. Перезапусти Local Server и попробуй снова.`;
+  }
+  return msg;
 }
 
 function chatModeMessage(mode, topic) {

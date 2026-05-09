@@ -1,5 +1,5 @@
 import { highlightSQL } from "./sql-highlight.js?v=2";
-import { initChat } from "./chat.js?v=7";
+import { initChat } from "./chat.js?v=8";
 import { loadTheme, saveTheme, watchSystemTheme } from "./settings.js";
 import { findTrackContext, resolveHref, tracks } from "./tracks.js?v=2";
 import { initExercises } from "./exercises.js?v=1";
