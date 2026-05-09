@@ -2400,6 +2400,46 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  // ===== JSONB углубление =====
+  "jsonb-ops-vs-pathops": {
+    title: "jsonb_ops vs jsonb_path_ops",
+    summary: "Два operator class-а для GIN-индекса по jsonb.",
+    examples: [
+      "CREATE INDEX ... ON docs USING GIN (data);                  -- jsonb_ops",
+      "CREATE INDEX ... ON docs USING GIN (data jsonb_path_ops);   -- меньше, быстрее на @>"
+    ],
+    pitfalls: [
+      "jsonb_path_ops поддерживает только @>",
+      "jsonb_ops крупнее, но универсальнее"
+    ],
+    learningGoals: ["выбирать operator class под нагрузку"]
+  },
+  "jsonb-jsonpath": {
+    title: "JSONPath: jsonb_path_query и @@",
+    summary: "Стандартный язык запросов внутри jsonb.",
+    examples: [
+      "SELECT * FROM docs WHERE data @@ '$.priority > 5';",
+      "SELECT jsonb_path_query(data, '$.items[*].sku') FROM docs;"
+    ],
+    pitfalls: [
+      "@@ — boolean-предикат; @? — существование пути",
+      "JSONPath ≠ JSON Pointer; синтаксис свой"
+    ],
+    learningGoals: ["писать выборки JSONPath", "видеть разницу между @@ и @?"]
+  },
+  "jsonb-expression-index": {
+    title: "Индекс по выражению из jsonb",
+    summary: "B-tree по конкретному пути — дешевле GIN, если запросы фиксированы.",
+    examples: [
+      "CREATE INDEX idx_docs_role ON docs ((data->>'role'));",
+      "CREATE INDEX idx_docs_priority ON docs (((data->>'priority')::int));"
+    ],
+    pitfalls: [
+      "Тип ->>'...' — text; для чисел нужен явный cast и тот же cast в запросе"
+    ],
+    learningGoals: ["когда B-tree дешевле GIN", "писать соответствующий WHERE"]
+  },
+
   // ===== window.html =====
   "win-intro": {
     title: "OVER — окно для каждой строки",

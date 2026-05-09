@@ -799,6 +799,90 @@ SELECT jsonb_array_elements(data-&gt;'tags') FROM docs;</pre>
           </div>
         </div>
       </article>
+
+      <article class="topic" id="jsonb-ops-vs-pathops">
+        <h3>jsonb_ops vs jsonb_path_ops</h3>
+        <p class="summary">Два operator class-а для GIN: универсальный и узкий.</p>
+        <div class="code-block">
+          <pre>-- jsonb_ops (по умолчанию): поддерживает @&gt;, @?, @@, ?, ?&amp;, ?|.
+CREATE INDEX idx_docs_data_gin ON docs USING GIN (data);
+
+-- jsonb_path_ops: поддерживает только @&gt; (containment).
+-- Меньше по размеру, быстрее на @&gt; — самой частой операции.
+CREATE INDEX idx_docs_data_path ON docs USING GIN (data jsonb_path_ops);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="jsonb-ops-vs-pathops">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>jsonb_ops</code> — индекс по каждому ключу и значению; поддерживает существование ключа (<code>?</code>) и др.</li>
+            <li><code>jsonb_path_ops</code> — индекс по «путям» (хеши); поддерживает только <code>@&gt;</code>, но обычно компактнее и быстрее.</li>
+            <li>Если 90% запросов — <code>data @&gt; '...'</code>, бери <code>jsonb_path_ops</code>.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="jsonb-jsonpath">
+        <h3>JSONPath: jsonb_path_query и оператор @@</h3>
+        <p class="summary">Стандартный язык запросов внутри jsonb (PG 12+).</p>
+        <div class="code-block">
+          <pre>-- Все теги, начинающиеся с 'js':
+SELECT jsonb_path_query(data, '$.tags[*] ? (@ like_regex "^js")') FROM docs;
+
+-- Проверка существования по выражению (@@):
+SELECT * FROM docs
+WHERE  data @@ '$.priority &gt; 5';
+
+-- @? — упрощённый существует ли путь:
+SELECT * FROM docs WHERE data @? '$.tags ? (@ == "urgent")';
+
+-- Извлечь как jsonb массив:
+SELECT jsonb_path_query_array(data, '$.items[*].sku') FROM docs;
+
+-- Лениво (как set-returning):
+SELECT id, jsonb_path_query(data, '$.items[*].name') FROM docs;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="jsonb-jsonpath">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>@@</code> — проверка предиката JSONPath, возвращает boolean.</li>
+            <li><code>@?</code> — существует ли путь.</li>
+            <li><code>jsonb_path_query</code> возвращает несколько строк (set-returning).</li>
+            <li>JSONPath — стандарт SQL/JSON, но синтаксис непривычный; читай документацию.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="jsonb-expression-index">
+        <h3>Индекс по выражению из jsonb</h3>
+        <p class="summary">Когда GIN — overkill, индексируй конкретный путь.</p>
+        <div class="code-block">
+          <pre>-- B-tree по конкретному полю — быстрее GIN, если запросы только по нему:
+CREATE INDEX idx_docs_role
+  ON docs ((data-&gt;&gt;'role'));
+
+-- запрос точно использует индекс:
+SELECT * FROM docs WHERE data-&gt;&gt;'role' = 'admin';
+
+-- ВАЖНО: тип результата -&gt;&gt; — text. Для числовых сравнений нужен cast:
+CREATE INDEX idx_docs_priority
+  ON docs (((data-&gt;&gt;'priority')::int));
+
+SELECT * FROM docs WHERE (data-&gt;&gt;'priority')::int &gt; 5;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="jsonb-expression-index">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Для одного-двух конкретных путей — индекс по выражению дешевле GIN. Для произвольных предикатов <code>@&gt;</code> — нужен GIN.</p>
+        </div>
+      </article>
     </section>
 
     <!-- ========== 20. Дата/время ========== -->
