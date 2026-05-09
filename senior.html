@@ -313,13 +313,13 @@ server_reset_query = DISCARD ALL</pre>
       </article>
 
       <article class="topic" id="sr-backup-pitr">
-        <h3>Бэкапы и PITR</h3>
-        <p class="summary">pg_dump, pg_basebackup и непрерывное архивирование WAL.</p>
+        <h3>Бэкапы: обзор и стратегия</h3>
+        <p class="summary">Логические (pg_dump) vs физические (pg_basebackup + WAL). Когда и какой использовать.</p>
         <div class="code-block">
           <pre># Логический бэкап одной БД:
 pg_dump -Fc -f /backup/app.dump app
 
-# Физический бэкап кластера:
+# Физический бэкап кластера + поток WAL для PITR:
 pg_basebackup -D /backup/base -X stream -P -R
 
 # Восстановление логического:
@@ -330,7 +330,192 @@ pg_restore -d app /backup/app.dump</pre>
           </div>
         </div>
         <div class="desc">
-          <p>Регулярно <em>проверяй восстановление</em>. Бэкап, который ни разу не разворачивали, — не бэкап. На проде смотри в сторону <code>pgBackRest</code> или <code>WAL-G</code>.</p>
+          <ul>
+            <li><strong>pg_dump</strong> — снимок одной БД на уровне SQL. Переносится между мажорными версиями. Не пишет WAL — нет PITR, восстановление до момента запуска.</li>
+            <li><strong>pg_basebackup</strong> — физическая копия каталога данных. В сочетании с WAL-архивом даёт PITR (восстановление на любой момент). Та же мажорная версия и архитектура.</li>
+            <li><strong>pgBackRest / WAL-G</strong> — production-grade обёртки: дельта-бэкапы, S3, encryption, параллелизм, валидация.</li>
+          </ul>
+          <p>Правило 3-2-1: 3 копии, на 2 разных носителях, 1 — за пределами площадки.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-pgdump-formats">
+        <h3>pg_dump / pg_dumpall: форматы и опции</h3>
+        <p class="summary">Plain SQL, custom (-Fc), directory (-Fd), tar (-Ft) — что выбрать.</p>
+        <div class="code-block">
+          <pre># Plain SQL (по умолчанию) — текст, можно читать глазами:
+pg_dump app &gt; app.sql
+psql -d app -f app.sql
+
+# Custom (-Fc) — сжатый бинарь, основной формат для pg_restore:
+pg_dump -Fc -f app.dump app
+pg_restore -d app app.dump
+
+# Directory (-Fd) — каталог, поддерживает параллельный дамп:
+pg_dump -Fd -j 4 -f /backup/app_dir app
+
+# Tar (-Ft) — для очень старых сценариев; используется редко:
+pg_dump -Ft -f app.tar app
+
+# Глобальные объекты (роли, табличные пространства):
+pg_dumpall --globals-only &gt; globals.sql
+
+# Все БД целиком (только для plain-формата):
+pg_dumpall -f cluster.sql
+
+# Полезные опции:
+pg_dump -Fc --no-owner --no-privileges -f app.dump app
+#   --no-owner       — на восстановлении не будет ALTER OWNER
+#   --no-privileges  — без GRANT/REVOKE; роли могут отличаться</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pgdump-formats">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Custom и directory можно частично восстанавливать (<code>--table</code>, <code>--schema</code>) и распараллеливать через <code>pg_restore -j</code>.</li>
+            <li>Plain не годится для частичного восстановления — это просто простыня SQL.</li>
+            <li><code>pg_dumpall</code> — единственный, кто экспортирует кластерные объекты (роли, тб-spaces). Дампы конкретных БД делай через <code>pg_dump -Fc</code>.</li>
+            <li>Сжатие (<code>-Z</code>) у custom-формата уже включено по умолчанию. Не сжимай ещё раз.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-pgrestore-parallel">
+        <h3>pg_restore -j: параллельное восстановление</h3>
+        <p class="summary">Самый дешёвый способ ускорить восстановление большой БД.</p>
+        <div class="code-block">
+          <pre># Восстановить custom-дамп в 8 потоков:
+pg_restore -d app -j 8 /backup/app.dump
+
+# Сначала схема, потом данные, потом индексы — для контроля:
+pg_restore -d app --section=pre-data  /backup/app.dump
+pg_restore -d app --section=data -j 8 /backup/app.dump
+pg_restore -d app --section=post-data -j 8 /backup/app.dump
+
+# Только конкретную таблицу:
+pg_restore -d app --table=orders /backup/app.dump
+
+# Сохранить SQL в файл, не применять:
+pg_restore -f restore.sql /backup/app.dump</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pgrestore-parallel">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>-j</code> работает только с custom (-Fc) и directory (-Fd) форматами.</li>
+            <li>Перед восстановлением выкручивай для целевой БД: <code>maintenance_work_mem</code>, <code>max_wal_size</code>, временно отключи <code>fsync</code> (только если можешь потерять кластер при сбое — для нового кластера это нормально).</li>
+            <li>Секции <code>pre-data</code> (DDL без индексов и FK), <code>data</code> (COPY), <code>post-data</code> (индексы, FK, триггеры) позволяют тонко управлять процессом.</li>
+            <li>Не забудь после восстановления: <code>ANALYZE</code> (статистика) и <code>VACUUM</code> при необходимости.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-pgbackrest-walg">
+        <h3>pgBackRest и WAL-G</h3>
+        <p class="summary">Промышленные инструменты для физических бэкапов и PITR.</p>
+        <div class="code-block">
+          <pre># pgBackRest: stanza + первый бэкап.
+# /etc/pgbackrest/pgbackrest.conf:
+[global]
+repo1-path=/var/lib/pgbackrest
+repo1-retention-full=2
+repo1-retention-diff=4
+repo1-cipher-type=aes-256-cbc
+repo1-cipher-pass=...
+
+[main]
+pg1-path=/var/lib/postgresql/16/main
+
+# В postgresql.conf:
+archive_mode = on
+archive_command = 'pgbackrest --stanza=main archive-push %p'
+
+# Команды:
+pgbackrest --stanza=main stanza-create
+pgbackrest --stanza=main backup --type=full
+pgbackrest --stanza=main backup --type=diff
+pgbackrest --stanza=main info
+pgbackrest --stanza=main restore --target='2026-05-09 12:00:00' --type=time
+
+# WAL-G — то же, но к S3/GCS из коробки:
+wal-g backup-push  /var/lib/postgresql/16/main
+wal-g backup-list
+wal-g backup-fetch /var/lib/postgresql/16/main LATEST</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pgbackrest-walg">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>pgBackRest</strong>: full / diff / incremental, параллельные бэкап и restore, шифрование, retention, валидация (<code>--check</code>).</li>
+            <li><strong>WAL-G</strong>: акцент на облако (S3, GCS, Azure), дельта по страницам, encryption, простая конфигурация в env.</li>
+            <li>Оба умеют PITR: непрерывно архивируют WAL и могут раскатать кластер на момент времени, LSN или имя метки.</li>
+            <li><code>pg_basebackup</code> голый — это «hello world» бэкапа. На проде используй pgBackRest или WAL-G.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-backup-retention">
+        <h3>Retention и тестирование</h3>
+        <p class="summary">Сколько хранить и как убедиться, что бэкап работает.</p>
+        <div class="code-block">
+          <pre># pgBackRest — встроенные ретеншны:
+repo1-retention-full=2     # держим 2 полных бэкапа
+repo1-retention-diff=7     # 7 дифференциальных
+repo1-retention-archive=2  # WAL за период полных бэкапов
+
+# Вручную (rsync/aws s3):
+# - daily: 7 дней
+# - weekly: 4 недели
+# - monthly: 12 месяцев
+# - yearly: 3 года
+
+# Контроль валидности:
+pgbackrest --stanza=main check
+pgbackrest --stanza=main verify
+
+# Регулярно — DR-учения:
+# 1. Развернуть кластер из бэкапа в staging.
+# 2. Проверить контрольные суммы / SELECT count(*) на ключевых таблицах.
+# 3. Зафиксировать RPO/RTO в инциденте.</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-backup-retention">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>RPO</strong> (Recovery Point Objective) — сколько данных можно потерять. С PITR — секунды (последний WAL).</li>
+            <li><strong>RTO</strong> (Recovery Time Objective) — сколько идёт восстановление. Зависит от размера и параллелизма.</li>
+            <li>Бэкап, который ни разу не разворачивали, — это не бэкап. Минимум раз в квартал — учения по восстановлению на чистом окружении.</li>
+            <li>Контрольные суммы страниц (<code>initdb --data-checksums</code>) ловят битый сектор до того, как испортит бэкапы.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-recovery-checklist">
+        <h3>Чек-лист восстановления</h3>
+        <p class="summary">Что делать, когда «упало». В этом порядке, без импровизации.</p>
+        <div class="desc">
+          <ol>
+            <li><strong>Зафиксировать инцидент.</strong> Время, симптомы, кто заметил. Не трогать прод до плана.</li>
+            <li><strong>Решить: что восстанавливаем.</strong> Только данные? Целиком кластер? До какого момента (PITR)? Куда (тот же сервер, новый, staging)?</li>
+            <li><strong>Изолировать продакшн.</strong> Перевести приложение в read-only / maintenance, чтобы не писать поверх кривого состояния.</li>
+            <li><strong>Сделать «снимок места преступления».</strong> Если есть возможность — сохранить текущее состояние ($PGDATA, логи) до правок. Поможет потом понять причину.</li>
+            <li><strong>Развернуть бэкап в staging.</strong> Никогда не лей восстановление сразу в прод-каталог — испортишь и его.</li>
+            <li><strong>PITR-таргет.</strong> Если PITR: <code>recovery_target_time = 'YYYY-MM-DD HH:MM:SS'</code> в <code>postgresql.conf</code>; для pgBackRest — <code>--type=time --target=...</code>.</li>
+            <li><strong>Проверка целостности.</strong> Контрольные SQL: <code>SELECT count(*)</code> по ключевым таблицам, последние транзакции, чек-сы. Сравнить с ожидаемым.</li>
+            <li><strong>Переключение трафика.</strong> Поменять DNS / connection string. Старый кластер выключить, не удалять.</li>
+            <li><strong>Postmortem.</strong> Что случилось, что не сработало, что добавить в чек-лист и алертинг.</li>
+          </ol>
+        </div>
+        <div class="ai-only">
+          <button class="btn" data-topic-id="sr-recovery-checklist">💬 Поучиться с ИИ</button>
         </div>
       </article>
     </section>

@@ -2400,6 +2400,76 @@ export const topics = {
     learningGoals: ["видеть, когда SQLite — лучший выбор", "не тащить Postgres туда, где не нужен"]
   },
 
+  // ===== Расширенные бэкапы =====
+  "sr-pgdump-formats": {
+    title: "pg_dump / pg_dumpall: форматы",
+    summary: "Plain SQL, custom (-Fc), directory (-Fd), tar (-Ft).",
+    examples: [
+      "pg_dump -Fc -f app.dump app",
+      "pg_dump -Fd -j 4 -f /backup/app_dir app",
+      "pg_dumpall --globals-only > globals.sql"
+    ],
+    pitfalls: [
+      "Plain нельзя восстанавливать частично",
+      "pg_dumpall — единственный, кто экспортирует роли и табл-пространства",
+      "Custom уже сжат, ещё раз gzip-ом не нужно"
+    ],
+    learningGoals: ["выбирать формат под задачу", "разделять кластерные и БД-объекты"]
+  },
+  "sr-pgrestore-parallel": {
+    title: "pg_restore -j: параллельное восстановление",
+    summary: "Ускоряем восстановление большой БД.",
+    examples: [
+      "pg_restore -d app -j 8 /backup/app.dump",
+      "pg_restore -d app --section=pre-data /backup/app.dump\npg_restore -d app --section=data -j 8 /backup/app.dump\npg_restore -d app --section=post-data -j 8 /backup/app.dump"
+    ],
+    pitfalls: [
+      "-j работает только с -Fc и -Fd, не с plain SQL",
+      "Перед массовым restore — поднять max_wal_size, maintenance_work_mem",
+      "После restore нужен ANALYZE — иначе планировщик слепой"
+    ],
+    learningGoals: ["распараллеливать восстановление", "разбивать на секции pre/data/post"]
+  },
+  "sr-pgbackrest-walg": {
+    title: "pgBackRest и WAL-G",
+    summary: "Промышленные инструменты физических бэкапов и PITR.",
+    examples: [
+      "pgbackrest --stanza=main backup --type=full\npgbackrest --stanza=main restore --target='2026-05-09 12:00:00' --type=time",
+      "wal-g backup-push /var/lib/postgresql/16/main\nwal-g backup-fetch /var/lib/postgresql/16/main LATEST"
+    ],
+    pitfalls: [
+      "archive_command должен быть надёжным — иначе WAL копится на сервере",
+      "Шифрование repo — обязательно для облака",
+      "Бэкап без проверки restore — это не бэкап"
+    ],
+    learningGoals: ["настроить промышленный бэкап с PITR", "понимать full/diff/incremental"]
+  },
+  "sr-backup-retention": {
+    title: "Retention и тестирование бэкапов",
+    summary: "Сколько хранить и как убедиться, что разворачивается.",
+    examples: [
+      "repo1-retention-full=2\nrepo1-retention-diff=7\nrepo1-retention-archive=2",
+      "pgbackrest --stanza=main verify"
+    ],
+    pitfalls: [
+      "RPO и RTO — два разных KPI; путать их — классика",
+      "DR-учения раз в квартал, иначе план «восстановления» — фикция",
+      "Контрольные суммы страниц нужны, чтобы битый сектор не уехал в бэкапы"
+    ],
+    learningGoals: ["задавать политику хранения", "отрабатывать DR-сценарий"]
+  },
+  "sr-recovery-checklist": {
+    title: "Чек-лист восстановления",
+    summary: "Порядок действий при инциденте: фиксация → план → изоляция → restore → проверка → переключение → postmortem.",
+    examples: [],
+    pitfalls: [
+      "Не лей restore поверх боевого $PGDATA — потеряешь и текущее состояние",
+      "Перед любыми правками — снимок «места преступления» (логи, $PGDATA)",
+      "Старый кластер выключить, но не удалять — пригодится для разбора"
+    ],
+    learningGoals: ["восстанавливать без импровизации", "разделять рестор и переключение трафика"]
+  },
+
   // ===== security.html =====
   "sec-pg-hba": {
     title: "pg_hba.conf и порядок правил",
