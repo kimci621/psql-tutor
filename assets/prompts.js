@@ -87,7 +87,12 @@ ${goals || "- помочь ученику разобраться в теме н�
 ${examples || "—"}
 
 Типичные подводные камни этой темы:
-${pitfalls || "—"}`;
+${pitfalls || "—"}${
+  topic.relatedTopics && topic.relatedTopics.length
+    ? "\n\nСвязанные темы (не ссылайся на URL — только упоминай по названию, если уместно):\n" +
+      topic.relatedTopics.map(r => `- ${r}`).join("\n")
+    : ""
+}`;
 }
 
 function buildExerciseSystemPrompt(topic, opts) {

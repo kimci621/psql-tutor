@@ -880,6 +880,45 @@ h1.page-title {
   background: var(--accent-soft);
 }
 
+/* ===== Связанные темы под карточкой ===== */
+.related-topics-wrap {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px;
+}
+.related-topics-wrap .related-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+ul.related-topics {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+ul.related-topics li {
+  background: var(--bg-elev);
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+}
+ul.related-topics a {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+ul.related-topics a:hover {
+  color: var(--accent);
+}
+
 /* ===== Деревья решений ===== */
 ul.decision-tree {
   list-style: none;

@@ -7,6 +7,8 @@ import { initProgressControls, initSidebarProgress } from "./progress.js?v=1";
 import { initSearch } from "./search.js?v=1";
 import { initTOC } from "./toc.js?v=1";
 import { initQuizzes } from "./quiz.js?v=1";
+import { topics } from "./topics.js";
+import { topicPageIndex } from "./topic-index.js?v=1";
 
 function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
@@ -185,6 +187,47 @@ function initTrackNavigation() {
 // Кнопка-якорь для каждой `.topic` с id: «копировать ссылку на тему».
 // Существующие id (например, data-topic-id) уже работают как якоря,
 // мы только подсвечиваем целевую тему и кладём в буфер обмена URL.
+// 4.5: рендерит маленький блок «Связано» под темой, если у неё в topics.js
+// есть relatedTopics. Поддерживает значения как id-темы, так и произвольный текст.
+function initRelatedTopics() {
+  const here = currentPagePath();
+  document.querySelectorAll(".topic[id]").forEach(t => {
+    const meta = topics[t.id];
+    if (!meta || !Array.isArray(meta.relatedTopics) || meta.relatedTopics.length === 0) return;
+    if (t.querySelector(".related-topics")) return;
+
+    const ul = document.createElement("ul");
+    ul.className = "related-topics";
+    meta.relatedTopics.forEach(r => {
+      const li = document.createElement("li");
+      const known = topicPageIndex[r];
+      if (known && topics[r]) {
+        const a = document.createElement("a");
+        a.href = relativizePath(known, here) + "#" + r;
+        a.textContent = topics[r].title || r;
+        li.appendChild(a);
+      } else {
+        li.textContent = r;
+      }
+      ul.appendChild(li);
+    });
+    const wrap = document.createElement("div");
+    wrap.className = "related-topics-wrap";
+    wrap.innerHTML = '<span class="related-label">Связано:</span>';
+    wrap.appendChild(ul);
+    t.appendChild(wrap);
+  });
+}
+
+function relativizePath(targetPage, fromPage) {
+  const inGuides = /\/guides\//.test("/" + fromPage);
+  if (inGuides) {
+    if (targetPage.startsWith("guides/")) return targetPage.slice("guides/".length);
+    return "../" + targetPage;
+  }
+  return targetPage;
+}
+
 function initTopicAnchors() {
   const topics = document.querySelectorAll(".topic[id]");
   topics.forEach(topic => {
@@ -314,6 +357,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initMobileSidebar();
   initTrackNavigation();
   initTopicAnchors();
+  initRelatedTopics();
   initExercises();
   initProgressTracking();
   initSearch();

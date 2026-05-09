@@ -1740,7 +1740,8 @@ export const topics = {
       "Без условия ON получится CROSS JOIN — декартово произведение",
       "Тип столбцов в ON должен совпадать, иначе будет implicit cast и потеря индекса"
     ],
-    learningGoals: ["писать корректное условие ON", "понимать порядок выполнения"]
+    learningGoals: ["писать корректное условие ON", "понимать порядок выполнения"],
+    relatedTopics: ["left-right-join", "semi-join", "composite-index"]
   },
   "left-right-join": {
     title: "LEFT и RIGHT OUTER JOIN",
