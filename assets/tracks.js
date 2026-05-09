@@ -46,6 +46,7 @@ export const tracks = [
     pages: [
       { href: 'scaling.html', title: 'Масштабирование' },
       { href: 'security.html', title: 'Безопасность' },
+      { href: 'tuning.html', title: 'Конфигурация и тюнинг' },
       { href: 'senior.html', title: 'Senior-уровень: производительность и прод' }
     ]
   }

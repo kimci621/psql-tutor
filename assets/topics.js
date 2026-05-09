@@ -2470,6 +2470,143 @@ export const topics = {
     learningGoals: ["восстанавливать без импровизации", "разделять рестор и переключение трафика"]
   },
 
+  // ===== tuning.html =====
+  "cfg-shared-buffers": {
+    title: "shared_buffers",
+    summary: "Размер буфер-пула Postgres.",
+    examples: [
+      "SHOW shared_buffers;",
+      "shared_buffers = 8GB"
+    ],
+    pitfalls: [
+      "Требует рестарта (shared memory)",
+      "Больше 32 ГБ обычно не растёт эффект",
+      "Слишком большой = двойное буферирование с кешем ОС"
+    ],
+    learningGoals: ["видеть hit-ratio", "понимать связь с кешем ОС"]
+  },
+  "cfg-work-mem": {
+    title: "work_mem",
+    summary: "Лимит памяти на каждую сортировку/хеш-операцию.",
+    examples: [
+      "SET work_mem = '64MB';",
+      "EXPLAIN (ANALYZE) ... -- ищем 'external merge'"
+    ],
+    pitfalls: [
+      "Это лимит на каждую операцию, а не на запрос",
+      "Реальный пик: max_connections × запросы × work_mem × кол-во операций",
+      "Поднимай локально (SET LOCAL), а не глобально"
+    ],
+    learningGoals: ["читать Sort Method в EXPLAIN", "ставить work_mem на сессию"]
+  },
+  "cfg-effective-cache-size": {
+    title: "effective_cache_size",
+    summary: "Подсказка планировщику о размере кеша.",
+    examples: [
+      "effective_cache_size = 24GB"
+    ],
+    pitfalls: [
+      "Это не выделение памяти, а оценка",
+      "Слишком мало → лишние seq-scan",
+      "Меняется на лету (SIGHUP)"
+    ],
+    learningGoals: ["задавать 50–75% RAM", "понимать влияние на выбор плана"]
+  },
+  "cfg-maintenance-work-mem": {
+    title: "maintenance_work_mem",
+    summary: "Память для VACUUM, CREATE INDEX, REINDEX, ALTER TABLE.",
+    examples: [
+      "SET maintenance_work_mem = '1GB';\nREINDEX INDEX CONCURRENTLY idx_orders_user_id;"
+    ],
+    pitfalls: [
+      "autovacuum использует autovacuum_work_mem (по умолчанию = maintenance_work_mem)",
+      "Поднимать перед миграциями и ребилдами"
+    ],
+    learningGoals: ["ускорять разовые операции"]
+  },
+  "cfg-checkpoint": {
+    title: "checkpoint_timeout, max_wal_size, completion_target",
+    summary: "Размазываем запись «грязных» страниц во времени.",
+    examples: [
+      "checkpoint_timeout = '15min'\nmax_wal_size = '8GB'\ncheckpoint_completion_target = 0.9",
+      "SELECT * FROM pg_stat_bgwriter;"
+    ],
+    pitfalls: [
+      "Много checkpoints_req = max_wal_size мал",
+      "Слишком большой timeout = долгий recovery",
+      "full_page_writes должен быть on на проде"
+    ],
+    learningGoals: ["читать pg_stat_bgwriter", "балансировать IO и recovery time"]
+  },
+  "cfg-wal-level": {
+    title: "wal_level",
+    summary: "minimal / replica / logical — что писать в WAL.",
+    examples: [
+      "wal_level = replica",
+      "archive_mode = on\narchive_command = 'pgbackrest --stanza=main archive-push %p'"
+    ],
+    pitfalls: [
+      "logical больше по объёму; включай только если нужен CDC/logical replication",
+      "minimal не даст ни PITR, ни реплик"
+    ],
+    learningGoals: ["выбирать уровень под задачу"]
+  },
+  "cfg-autovacuum": {
+    title: "autovacuum: пороги срабатывания",
+    summary: "Глобальные параметры + per-table тюнинг.",
+    examples: [
+      "ALTER TABLE orders SET (\n  autovacuum_vacuum_scale_factor = 0.05,\n  autovacuum_analyze_scale_factor = 0.02\n);",
+      "SELECT relname, n_live_tup, n_dead_tup, last_autovacuum FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 10;"
+    ],
+    pitfalls: [
+      "scale_factor 0.2 для огромной таблицы — слишком редко",
+      "Никогда не выключай autovacuum — только перенастраивай",
+      "cost_delay тормозит autovacuum; на горячих таблицах нужно его уменьшать"
+    ],
+    learningGoals: ["per-table тюнинг", "видеть n_dead_tup"]
+  },
+  "cfg-max-connections": {
+    title: "max_connections",
+    summary: "Каждое соединение — процесс и память. Высокий лимит дорог.",
+    examples: [
+      "SHOW max_connections;",
+      "SELECT state, count(*) FROM pg_stat_activity GROUP BY state;"
+    ],
+    pitfalls: [
+      "Эмпирика: max_connections ≈ 4 × CPU cores; дальше пул",
+      "Сотни idle = нет пула на стороне приложения",
+      "Поднимать без необходимости — терять память на shared structures"
+    ],
+    learningGoals: ["видеть нагрузку через pg_stat_activity"]
+  },
+  "cfg-pgbouncer": {
+    title: "PgBouncer: режимы пулинга",
+    summary: "session / transaction / statement — что они меняют.",
+    examples: [
+      "pool_mode = transaction\ndefault_pool_size = 25\nmax_client_conn = 2000",
+      "psql -h 127.0.0.1 -p 6432 pgbouncer -U pgbouncer -c 'SHOW POOLS;'"
+    ],
+    pitfalls: [
+      "transaction-режим ломает LISTEN, временные таблицы, SET вне транзакции",
+      "prepared statements клиента в transaction-режиме без поддержки protocol-level — не работают",
+      "statement-режим запрещает мульти-stmt транзакции"
+    ],
+    learningGoals: ["выбирать режим под драйвер", "читать SHOW POOLS"]
+  },
+  "cfg-planner-io": {
+    title: "random_page_cost, effective_io_concurrency",
+    summary: "Стоимости IO для планировщика; параллельное случайное чтение.",
+    examples: [
+      "random_page_cost = 1.1\neffective_io_concurrency = 200"
+    ],
+    pitfalls: [
+      "Дефолт 4.0 для HDD; на SSD «боится» индекс-сканов",
+      "effective_io_concurrency для NVMe — 100–300",
+      "jit = on иногда замедляет короткие OLTP"
+    ],
+    learningGoals: ["настроить cost под SSD", "понимать влияние на выбор плана"]
+  },
+
   // ===== security.html =====
   "sec-pg-hba": {
     title: "pg_hba.conf и порядок правил",

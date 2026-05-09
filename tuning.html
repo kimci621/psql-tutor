@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конфигурация и тюнинг — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=9"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>PostgreSQL Tutor</h1>
+    <div class="tag">Локальный учебник</div>
+    <ul class="nav">
+      <li><a href="basics.html">Основы</a></li>
+      <li><a href="install.html">Установка</a></li>
+      <li><a href="cheatsheet.html">Шпаргалка</a></li>
+      <li><a href="types.html">Типы данных</a></li>
+      <li><a href="joins.html">Соединения</a></li>
+      <li><a href="aggregates.html">Агрегации</a></li>
+      <li><a href="transactions.html">Транзакции</a></li>
+      <li><a href="indexes.html">Индексы</a></li>
+      <li><a href="scaling.html">Масштабирование</a></li>
+      <li><a href="programming.html">Программирование</a></li>
+      <li><a href="security.html">Безопасность</a></li>
+      <li><a href="tuning.html">Конфигурация и тюнинг</a></li>
+      <li><a href="tooling.html">Тулинг</a></li>
+      <li><a href="errors.html">Частые ошибки</a></li>
+      <li><a href="senior.html">Senior-уровень</a></li>
+      <li class="group-title">Гайды</li>
+      <li><a href="guides/list-tables.html">Список таблиц</a></li>
+      <li><a href="guides/create-table.html">Создание таблицы</a></li>
+      <li><a href="guides/vacuum.html">VACUUM</a></li>
+      <li><a href="guides/list-users.html">Список пользователей</a></li>
+      <li><a href="guides/create-index.html">Создание индекса</a></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Конфигурация и тюнинг</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Конфигурация и тюнинг PostgreSQL</h1>
+    <p class="page-lead">
+      Главные параметры <code>postgresql.conf</code>: память, чекпоинты, autovacuum, подключения.
+      Не «настройки на максимум», а понимание, что каждый параметр меняет, и как смотреть, помогло ли.
+    </p>
+
+    <section class="category">
+      <h2>1. Память</h2>
+
+      <article class="topic" id="cfg-shared-buffers">
+        <h3>shared_buffers</h3>
+        <p class="summary">Размер буфер-пула Postgres — куда читаются страницы данных и индексов из диска.</p>
+        <div class="code-block">
+          <pre>-- Текущее значение:
+SHOW shared_buffers;
+
+-- Стартовая рекомендация: 25% оперативки сервера, но не больше 32 ГБ.
+-- /etc/postgresql/16/main/postgresql.conf:
+shared_buffers = 8GB
+
+-- Применить:
+-- shared_buffers требует рестарта (это область разделяемой памяти).</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-shared-buffers">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>На больше 32 ГБ обычно не растёт эффект — дальше работает кеш ОС, который Postgres тоже использует.</li>
+            <li>Слишком маленький <code>shared_buffers</code> = много обращений в кеш ОС / диск. Слишком большой = двойное буферирование с кешем ОС.</li>
+            <li>Смотреть hit-ratio: <code>pg_stat_database</code> (<code>blks_hit / (blks_hit + blks_read)</code>) или расширение <code>pg_buffercache</code>.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="cfg-work-mem">
+        <h3>work_mem</h3>
+        <p class="summary">Сколько памяти разрешено каждой сортировке/хеш-операции, прежде чем уйти на диск.</p>
+        <div class="code-block">
+          <pre>-- На сессию:
+SET work_mem = '64MB';
+
+-- Глобально (postgresql.conf):
+work_mem = 16MB
+
+-- Подсмотреть, насколько хватает:
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders ORDER BY total DESC LIMIT 100;
+-- "Sort Method: external merge  Disk: 12345kB"  ← мало work_mem
+-- "Sort Method: quicksort  Memory: 12345kB"     ← хватило</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-work-mem">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Опасно:</strong> <code>work_mem</code> — это лимит на <em>каждую</em> операцию. Один сложный запрос может породить 5 хеш-джойнов и 2 сортировки, потребив <code>7 × work_mem</code>.</li>
+            <li>Реальный пик памяти ≈ <code>max_connections × запросы × work_mem × число_операций</code>.</li>
+            <li>Поднимай локально (<code>SET LOCAL</code>) для тяжёлых отчётов, а не глобально.</li>
+            <li>Связанный параметр: <code>hash_mem_multiplier</code> (PG 13+) — отдельный множитель для хеш-операций.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="cfg-effective-cache-size">
+        <h3>effective_cache_size</h3>
+        <p class="summary">«Подсказка» планировщику, сколько данных, по его мнению, сейчас в кеше (Postgres + ОС).</p>
+        <div class="code-block">
+          <pre>-- Это не выделение памяти, а оценка для планировщика.
+-- postgresql.conf:
+effective_cache_size = 24GB
+
+-- Стартовая рекомендация: 50–75% RAM сервера.</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-effective-cache-size">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Чем больше значение, тем охотнее планировщик выбирает индексное чтение (Index Scan / Bitmap) вместо последовательного. Если значение слишком мало — планы получаются с лишними seq-scan-ами.</p>
+          <p>Параметр не резервирует память. Можно менять на лету (<code>SIGHUP</code>).</p>
+        </div>
+      </article>
+
+      <article class="topic" id="cfg-maintenance-work-mem">
+        <h3>maintenance_work_mem</h3>
+        <p class="summary">Память для VACUUM, CREATE INDEX, ALTER TABLE, REINDEX.</p>
+        <div class="code-block">
+          <pre>-- Поднимаем для разовых операций (миграции, ребилд индекса):
+SET maintenance_work_mem = '1GB';
+REINDEX INDEX CONCURRENTLY idx_orders_user_id;
+
+-- Или глобально, но скромнее:
+maintenance_work_mem = 256MB</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-maintenance-work-mem">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Влияет на скорость восстановления из дампа, ребилда индексов и autovacuum. Autovacuum использует <code>autovacuum_work_mem</code> (по умолчанию = <code>maintenance_work_mem</code>).</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>2. WAL и чекпоинты</h2>
+
+      <article class="topic" id="cfg-checkpoint">
+        <h3>checkpoint_timeout, max_wal_size, checkpoint_completion_target</h3>
+        <p class="summary">Чекпоинт — момент, когда «грязные» страницы пишутся на диск. Слишком частые — IO-всплеск; слишком редкие — долгий recovery.</p>
+        <div class="code-block">
+          <pre>-- postgresql.conf:
+checkpoint_timeout = '15min'              -- максимум время между чекпоинтами
+max_wal_size = '8GB'                      -- мягкий лимит размера WAL
+min_wal_size = '1GB'                      -- держим минимум
+checkpoint_completion_target = 0.9        -- размазываем запись на 90% интервала
+wal_compression = on
+
+-- Мониторинг:
+SELECT * FROM pg_stat_bgwriter;
+-- checkpoints_timed   — по таймауту (хорошо)
+-- checkpoints_req     — по WAL-объёму (плохо, если много)</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-checkpoint">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Если в <code>pg_stat_bgwriter</code> много <code>checkpoints_req</code> — <code>max_wal_size</code> мал, чекпоинты вынужденные. Поднимай.</li>
+            <li><code>checkpoint_completion_target = 0.9</code> размазывает запись по большей части интервала, снижая IO-пики.</li>
+            <li>На SSD/NVMe можно безопасно поднимать <code>max_wal_size</code> до десятков ГБ.</li>
+            <li><code>full_page_writes = on</code> — обязательно на проде; защита от torn-page при сбое.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="cfg-wal-level">
+        <h3>wal_level и архивирование</h3>
+        <p class="summary">Сколько информации писать в WAL: минимум, репликация или логическая.</p>
+        <div class="code-block">
+          <pre># postgresql.conf:
+wal_level = replica          # минимум для физических реплик и PITR
+# wal_level = logical        # для logical replication / CDC (Debezium)
+
+archive_mode = on
+archive_command = 'pgbackrest --stanza=main archive-push %p'</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-wal-level">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>logical</code> добавляет в WAL информацию для логической репликации; чуть-чуть больше объёма. Включай, только если реально используется (slot, publication, CDC).</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>3. Autovacuum</h2>
+
+      <article class="topic" id="cfg-autovacuum">
+        <h3>autovacuum_*: пороги срабатывания</h3>
+        <p class="summary">Autovacuum нельзя выключать. Можно — настраивать частоту по конкретной таблице.</p>
+        <div class="code-block">
+          <pre>-- Глобальные пороги (postgresql.conf):
+autovacuum = on
+autovacuum_naptime = '1min'
+autovacuum_vacuum_threshold = 50
+autovacuum_vacuum_scale_factor = 0.2     -- VACUUM, если изменено 20% строк + 50
+autovacuum_analyze_threshold = 50
+autovacuum_analyze_scale_factor = 0.1    -- ANALYZE, если 10% строк + 50
+
+-- Для горячих таблиц делаем агрессивнее:
+ALTER TABLE orders SET (
+  autovacuum_vacuum_scale_factor = 0.05,
+  autovacuum_analyze_scale_factor = 0.02,
+  autovacuum_vacuum_cost_delay = 2ms
+);
+
+-- Сколько dead-строк сейчас:
+SELECT relname, n_live_tup, n_dead_tup,
+       last_autovacuum, last_autoanalyze
+FROM   pg_stat_user_tables
+ORDER  BY n_dead_tup DESC
+LIMIT  10;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-autovacuum">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>scale_factor</code> = 0.2 для огромной таблицы значит «трогать только когда обновлено 20% строк» — это редко. Снижай для горячих таблиц.</li>
+            <li><code>autovacuum_max_workers</code> — сколько параллельных воркеров; обычно 3–5.</li>
+            <li><code>autovacuum_vacuum_cost_*</code> — троттлинг IO. На проде иногда нужно <em>понизить</em> <code>cost_delay</code>, чтобы autovacuum успевал.</li>
+            <li><strong>Никогда не выключай autovacuum</strong>. Альтернатива — перенастроить, не отключать.</li>
+            <li>Связано: <a href="guides/vacuum.html">Гайд: VACUUM</a>.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>4. Подключения и пулинг</h2>
+
+      <article class="topic" id="cfg-max-connections">
+        <h3>max_connections vs PgBouncer</h3>
+        <p class="summary">Каждое соединение — отдельный процесс, ~10 МБ памяти и слот в shared-памяти. Высокий <code>max_connections</code> — это всегда дорого.</p>
+        <div class="code-block">
+          <pre>-- postgresql.conf:
+max_connections = 200             -- осторожно: каждое стоит RAM и shared mem
+superuser_reserved_connections = 3
+
+-- Текущая нагрузка:
+SELECT state, count(*)
+FROM   pg_stat_activity
+GROUP  BY state;
+
+-- Активные тяжёлые сессии:
+SELECT pid, usename, application_name,
+       now() - query_start AS dur, state, query
+FROM   pg_stat_activity
+WHERE  state &lt;&gt; 'idle'
+ORDER  BY query_start
+LIMIT  20;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-max-connections">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Эмпирическая «верхняя граница без боли»: <code>max_connections ≈ 4 × CPU cores</code>. Дальше — пул.</li>
+            <li>Каждое соединение жрёт <code>work_mem × кол-во операций</code> при тяжёлом запросе. См. <a href="#cfg-work-mem">work_mem</a>.</li>
+            <li>Сотни «idle» соединений — индикатор отсутствия пула на стороне приложения.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="cfg-pgbouncer">
+        <h3>PgBouncer: режимы пулинга</h3>
+        <p class="summary">Между приложением и Postgres ставится PgBouncer; тысячи клиентских коннектов превращаются в десятки серверных.</p>
+        <div class="code-block">
+          <pre># pgbouncer.ini (минимум):
+[databases]
+app = host=db1 port=5432 dbname=app
+
+[pgbouncer]
+listen_addr = *
+listen_port = 6432
+auth_type = scram-sha-256
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction         # session | transaction | statement
+default_pool_size = 25          # серверных соединений на одну (db, user)
+max_client_conn = 2000          # клиентских — сколько хочешь
+reserve_pool_size = 5
+server_idle_timeout = 600
+
+# Метрики:
+psql -h 127.0.0.1 -p 6432 pgbouncer -U pgbouncer -c 'SHOW POOLS;'</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-pgbouncer">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>session</strong> — серверный коннект держится, пока клиент не отпустит. Эквивалентно прямому подключению.</li>
+            <li><strong>transaction</strong> — серверный коннект отдаётся обратно после <code>COMMIT/ROLLBACK</code>. Главный режим. Сессионные штуки (<code>LISTEN</code>, временные таблицы, <code>SET</code> вне транзакции, prepared statements клиента) ломаются.</li>
+            <li><strong>statement</strong> — после каждого SQL. Совсем строгий, мультистейтмент-транзакции не работают.</li>
+            <li>Альтернативы: <code>pgcat</code> (Rust), встроенный пул в драйвере (HikariCP, asyncpg). Часто комбинируют: пул в драйвере + PgBouncer.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>5. Планировщик и ввод-вывод</h2>
+
+      <article class="topic" id="cfg-planner-io">
+        <h3>random_page_cost / seq_page_cost / effective_io_concurrency</h3>
+        <p class="summary">Стоимости операций для планировщика и параллелизм случайного чтения.</p>
+        <div class="code-block">
+          <pre>-- На SSD/NVMe случайное чтение почти такое же быстрое, как последовательное:
+SET random_page_cost = 1.1;        -- было 4.0
+SET seq_page_cost    = 1.0;
+SET effective_io_concurrency = 200; -- для bitmap heap scan
+
+-- Глобально:
+random_page_cost = 1.1
+effective_io_concurrency = 200</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="cfg-planner-io">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Дефолтный <code>random_page_cost = 4</code> рассчитан на HDD. На SSD/NVMe ставь 1.1–1.5 — иначе планировщик «боится» индексных чтений.</li>
+            <li><code>effective_io_concurrency</code> — сколько параллельных чтений может выдержать диск. Для NVMe — 100–300.</li>
+            <li><code>jit = on</code> ускоряет агрегации; на коротких OLTP-запросах может, наоборот, замедлять (компиляция дороже).</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Связанные темы</h2>
+      <article class="topic concept">
+        <h3>Где ещё</h3>
+        <div class="desc">
+          <ul>
+            <li><a href="senior.html#sr-pg-stat-statements">pg_stat_statements</a> — поиск тяжёлых запросов.</li>
+            <li><a href="senior.html#sr-explain-analyze">EXPLAIN (ANALYZE, BUFFERS)</a> — что внутри плана.</li>
+            <li><a href="guides/vacuum.html">Гайд: VACUUM</a> — пошагово про bloat и autovacuum.</li>
+            <li><a href="scaling.html">Масштабирование</a> — пулинг и репликация.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+</body>
+</html>
