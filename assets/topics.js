@@ -291,7 +291,7 @@ export const topics = {
   },
   "filtering": {
     title: "Фильтрация: WHERE, IN, BETWEEN, LIKE",
-    summary: "Базовые операторы и работа с NULL.",
+    summary: "WHERE с операторами =, <>, IN, BETWEEN, LIKE — и невидимая ловушка с NULL, который не равен ни одному значению, даже самому себе.",
     examples: [
       "SELECT * FROM products WHERE price BETWEEN 100 AND 500;",
       "SELECT * FROM orders WHERE status IN ('new','paid');",
@@ -400,7 +400,7 @@ export const topics = {
   },
   "recursive-cte": {
     title: "Рекурсивные CTE",
-    summary: "Обход иерархий и графов.",
+    summary: "WITH RECURSIVE — единственный способ написать в SQL обход иерархии или графа: дерево комментариев, цепочка менеджеров, связи между деталями.",
     examples: [
       "WITH RECURSIVE tree AS (\n  SELECT id, parent_id, 1 AS depth FROM categories WHERE parent_id IS NULL\n  UNION ALL\n  SELECT c.id, c.parent_id, t.depth + 1\n  FROM categories c JOIN tree t ON c.parent_id = t.id\n)\nSELECT * FROM tree;"
     ],
@@ -471,7 +471,7 @@ export const topics = {
   },
   "gin-index": {
     title: "GIN-индексы для jsonb и массивов",
-    summary: "Индексирование составных значений.",
+    summary: "GIN — индекс для значений, состоящих из элементов: массивы, jsonb, полнотекст, триграммы. Когда B-tree бессилен «искать внутри», работает GIN.",
     examples: [
       "CREATE INDEX idx_docs_data ON docs USING gin (data);",
       "CREATE INDEX idx_docs_tags ON docs USING gin (tags);"
@@ -542,7 +542,7 @@ export const topics = {
   },
   "materialized-view": {
     title: "Материализованные представления",
-    summary: "MATERIALIZED VIEW и REFRESH.",
+    summary: "MATERIALIZED VIEW — кешированный результат тяжёлого SELECT, материализованный в таблицу. Обновляется по команде REFRESH, не автоматически.",
     examples: [
       "CREATE MATERIALIZED VIEW daily_stats AS\nSELECT date_trunc('day', created_at) AS d, count(*)\nFROM orders GROUP BY 1;",
       "REFRESH MATERIALIZED VIEW CONCURRENTLY daily_stats;"
@@ -652,7 +652,7 @@ export const topics = {
   // 18. EXPLAIN
   "explain": {
     title: "EXPLAIN и EXPLAIN ANALYZE",
-    summary: "План запроса и фактические тайминги.",
+    summary: "EXPLAIN — окно в работу планировщика. Показывает, в каком порядке Postgres хочет читать таблицы, использовать ли индекс и сколько строк ожидает.",
     examples: [
       "EXPLAIN SELECT * FROM orders WHERE user_id = 1;",
       "EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM orders WHERE user_id = 1;"
@@ -672,7 +672,7 @@ export const topics = {
   // 19. JSON / JSONB
   "jsonb": {
     title: "JSONB — операции и индексы",
-    summary: "Доступ ->, ->>, поиск @>, индексы GIN.",
+    summary: "Универсальный тип для полуструктурированных данных. -> и ->> для доступа, @> и ? для поиска, GIN-индекс для запросов внутри документа.",
     examples: [
       "SELECT data->>'name' AS name FROM docs;",
       "SELECT * FROM docs WHERE data @> '{\"role\":\"admin\"}';",
@@ -829,7 +829,7 @@ export const topics = {
   },
   "err-not-null": {
     title: "Ошибка: null value in column violates not-null constraint",
-    summary: "В обязательный столбец пришёл NULL.",
+    summary: "Ошибка вставки: в столбец с NOT NULL пришёл NULL. Обычно — забыли значение в INSERT или DEFAULT не подтянулся.",
     examples: [
       "ALTER TABLE users ALTER COLUMN email SET DEFAULT '';"
     ],
@@ -891,7 +891,7 @@ export const topics = {
   },
   "err-division-by-zero": {
     title: "Ошибка: division by zero",
-    summary: "Деление на ноль в выражении.",
+    summary: "22012 division_by_zero — арифметика на ноль. Чаще всего срабатывает в выражениях вроде sum(x) / count(*) на пустом наборе.",
     examples: [
       "SELECT a / NULLIF(b, 0) FROM t;"
     ],
@@ -1093,7 +1093,7 @@ export const topics = {
   },
   "sr-listen-notify": {
     title: "LISTEN / NOTIFY",
-    summary: "Лёгкая шина событий внутри Postgres.",
+    summary: "Лёгкая шина событий прямо в Postgres: одна сессия делает NOTIFY, другие через LISTEN получают уведомления. Хорошо для cache-invalidation, плохо для гарантированной доставки.",
     examples: [
       "LISTEN order_created;",
       "NOTIFY order_created, '{\"id\": 42}';",
@@ -1218,7 +1218,7 @@ export const topics = {
 
   "sr-rls": {
     title: "Row-Level Security",
-    summary: "Политики доступа на уровне строк.",
+    summary: "Row-Level Security — фильтры доступа на уровне строк, прозрачные для приложения. Основа multi-tenant: один и тот же SELECT * FROM documents у разных арендаторов вернёт разное.",
     examples: [
       "ALTER TABLE documents ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY tenant_isolation ON documents\n  USING (tenant_id = current_setting('app.tenant_id')::bigint);\n\n-- из приложения перед запросами:\nSET app.tenant_id = '42';"
     ],
@@ -1252,7 +1252,7 @@ export const topics = {
   },
   "sr-prepared-statements": {
     title: "Prepared statements и SQL-инъекции",
-    summary: "Параметризация — защита и кэш плана.",
+    summary: "PREPARE + EXECUTE: параметризованный SQL. Одновременно защита от инъекций (значение не клеится в текст запроса) и переиспользование плана между вызовами.",
     examples: [
       "PREPARE p (bigint) AS SELECT * FROM orders WHERE user_id = $1;\nEXECUTE p (42);\nDEALLOCATE p;",
       "-- В приложении используй placeholders драйвера, никогда не клей строки SQL"
@@ -1271,7 +1271,7 @@ export const topics = {
 
   "sr-fulltext": {
     title: "Полнотекстовый поиск",
-    summary: "tsvector, tsquery, GIN-индекс.",
+    summary: "Полнотекстовый поиск в Postgres: tsvector хранит «слова», tsquery — запрос, GIN-индекс ищет за миллисекунды. Часто заменяет Elasticsearch.",
     examples: [
       "ALTER TABLE articles ADD COLUMN tsv tsvector\n  GENERATED ALWAYS AS (to_tsvector('russian', coalesce(title,'') || ' ' || coalesce(body,''))) STORED;\n\nCREATE INDEX idx_articles_tsv ON articles USING gin (tsv);\n\nSELECT id, ts_rank(tsv, q) AS rank\nFROM   articles, plainto_tsquery('russian', $1) q\nWHERE  tsv @@ q\nORDER  BY rank DESC\nLIMIT  20;"
     ],
@@ -1305,7 +1305,7 @@ export const topics = {
 
   "sr-app-orm": {
     title: "Postgres из приложения: ORM vs raw SQL",
-    summary: "Когда ORM помогает, а когда мешает.",
+    summary: "ORM удобен для CRUD, но молча генерирует N+1 на любой связи и плохо переводит сложные отчёты. Главный навык — видеть, где он мешает.",
     examples: [
       "-- N+1: ORM генерит по одному SELECT на каждую сущность\n-- решение: include/eager-load или ручной JOIN\n\n-- raw SQL уместен для отчётов, оконок, CTE, EXPLAIN-чувствительных мест"
     ],
@@ -1322,7 +1322,7 @@ export const topics = {
   },
   "sr-observability": {
     title: "Наблюдаемость PostgreSQL",
-    summary: "pg_stat_*, slow log, метрики, алерты.",
+    summary: "Что мониторить со стороны БД: pg_stat_database, pg_stat_statements, slow log, ожидания блокировок, лаг репликации. Без этих метрик инциденты разбираются вслепую.",
     examples: [
       "SELECT datname, numbackends, xact_commit, xact_rollback,\n       blks_read, blks_hit, deadlocks\nFROM   pg_stat_database\nORDER  BY datname;",
       "ALTER SYSTEM SET log_min_duration_statement = '500ms';",
@@ -1363,7 +1363,11 @@ export const topics = {
   "why-dbms": {
     title: "Зачем нам СУБД",
     summary: "Чем СУБД отличается от файлов и почему это удобнее, чем «хранить всё в JSON».",
-    examples: [],
+    examples: [
+      "Сценарий: 100 пользователей одновременно покупают последний товар. Без СУБД нужен лок на файл, обработка очереди и страх потери данных при крэше. С СУБД — UPDATE products SET in_stock = in_stock - 1 WHERE id = $1 AND in_stock > 0 RETURNING id; и одна транзакция за неуспешные.",
+      "Сравни «папка с CSV» и таблица: добавить новую колонку в CSV — переписать все строки, индекс отсутствует, поиск — full scan; в БД — ALTER TABLE добавляет колонку метаданно за миллисекунды и индекс создаётся отдельно.",
+      "Гарантии, которые даёт СУБД и которые сами не появятся: атомарность транзакций, согласованность, изоляция параллельных операций, восстановление после сбоя, контроль типов и ограничений."
+    ],
     pitfalls: [
       "Файлы не дают конкурентного доступа без блокировок",
       "Самописное хранилище сложно сделать ACID-надёжным",
@@ -1394,7 +1398,11 @@ export const topics = {
   "about-postgres": {
     title: "О PostgreSQL",
     summary: "Что такое Postgres: лицензия, история, чем он отличается от MySQL и Oracle.",
-    examples: [],
+    examples: [
+      "Postgres — реляционная СУБД с открытой лицензией (PostgreSQL License, BSD-подобная), без копилефта. Не делают патчей под отдельные облака, но облака предлагают managed Postgres (Aurora, Cloud SQL, Azure DB).",
+      "Сильные стороны: типы данных (jsonb, range, array, PostGIS), оконные функции, расширения, MVCC. Слабая (но решаемая) сторона: read-replica всегда async; sync — только если явно настроишь.",
+      "Версионирование: один major-релиз в год (16, 17, 18 …), поддержка 5 лет. Major — это новый каталог данных, нужен pg_upgrade или dump/restore. Minor (16.2 → 16.3) — без миграции."
+    ],
     pitfalls: [
       "PostgreSQL ≠ Postgres Pro: последний — отдельный коммерческий форк",
       "MVCC и расширяемость типов — два главных архитектурных козыря"
@@ -1407,7 +1415,11 @@ export const topics = {
   "terminology": {
     title: "Термины: настоящие и сленговые",
     summary: "tuple/row, relation/table, attribute/column, predicate, query plan, MVCC.",
-    examples: [],
+    examples: [
+      "Реляция = таблица. Кортеж = строка (tuple, row). Атрибут = столбец. Это академические синонимы — в коде ты пишешь TABLE, ROW, COLUMN, но в литературе встретишь и первое.",
+      "Сленг команды: «база» обычно значит «БД внутри кластера» (postgres / app / staging), реже — весь кластер. «Запрос» — это и SELECT, и INSERT/UPDATE, и DDL. «Курсор» в SQL и в IDE — разные сущности.",
+      "Особенно путают: schema (логическое пространство имён внутри БД, типа public) vs database (отдельная БД в кластере) vs cluster (набор БД, обслуживаемый одним postgres-процессом)."
+    ],
     pitfalls: [
       "В академической литературе «relation» — это таблица; в обиходе — связь между ними",
       "tuple ≈ row, но tuple включает «версию строки» в MVCC"
@@ -1516,7 +1528,11 @@ export const topics = {
   "sql-declarative": {
     title: "SQL — декларативный язык",
     summary: "Ты описываешь «что» получить, а не «как». «Как» решает планировщик.",
-    examples: [],
+    examples: [
+      "Декларативный: SELECT u.email FROM users u JOIN orders o ON o.user_id = u.id WHERE o.total > 1000; — ты сказал «что», планировщик решил, как (порядок join-а, использовать ли индекс, какой алгоритм соединения).",
+      "Императивный аналог на псевдокоде: for u in users: for o in orders: if o.user_id == u.id and o.total > 1000: yield u.email — здесь ты задал и порядок, и алгоритм. Менять стратегию — переписывать код.",
+      "Поэтому EXPLAIN — ключевой инструмент: ты сам не задаёшь план, но можешь его прочитать и понять, согласен ли с выбором планировщика."
+    ],
     pitfalls: [
       "Один и тот же результат можно записать многими способами — план будет разным",
       "Подсказки планировщику в Postgres ограничены — рычаги через индексы и статистику"
@@ -1544,7 +1560,11 @@ export const topics = {
   "relational-vs-nosql": {
     title: "Реляционные vs нереляционные СУБД",
     summary: "Когда нужен Postgres, когда — Mongo/Redis/Cassandra. Что Postgres умеет из «нереляционного».",
-    examples: [],
+    examples: [
+      "Postgres подходит, если: данные связаны (orders ↔ users ↔ products), нужны транзакции и foreign keys, нужны сложные выборки с JOIN и GROUP BY. 99% продуктовых БД именно такие.",
+      "Mongo / DocumentDB — когда схема плавает между объектами, связи слабые, по большинству ключей доступ по точному совпадению. Можно делать то же на Postgres + jsonb, но мотив выбрать Mongo — не «он быстрее», а «у нас правда нет связей».",
+      "Redis — горячий кэш и rate-limiter, не основное хранилище. Cassandra — write-heavy, eventual consistency, ключи и часть значений известны заранее. Если сомневаешься — начинай с Postgres."
+    ],
     pitfalls: [
       "jsonb в Postgres часто закрывает 80% задач, для которых тянут отдельный документный store",
       "Нереляционные СУБД жертвуют согласованностью ради масштаба"
@@ -1607,7 +1627,11 @@ export const topics = {
   "install-overview": {
     title: "Варианты установки",
     summary: "Пакетный менеджер ОС, Docker, бинарные сборки, исходники, managed-облако.",
-    examples: [],
+    examples: [
+      "Локальная разработка: Docker (postgres:16-alpine) — за 10 секунд, можно удалить целиком одной командой. Альтернатива на Mac — postgres.app, на Linux — apt/dnf-пакет.",
+      "Прод: managed (RDS / Cloud SQL / Yandex Managed) — берут на себя бэкапы, мажорные апгрейды, мониторинг базового уровня. Свой сервер — больше контроля и дешевле в большом масштабе.",
+      "Сборка из исходников нужна редко: для разработчиков Postgres, для нестандартного OS/архитектуры или специфических флагов компиляции."
+    ],
     pitfalls: [
       "Версия из репозитория ОС часто отстаёт от актуальной",
       "Для прода обычно используют официальный pgdg-репозиторий или managed-сервис"
@@ -1669,7 +1693,11 @@ export const topics = {
   "types-why": {
     title: "Зачем нужны типы данных",
     summary: "Типы — контракт. Они защищают от мусора, ускоряют сравнения и экономят место.",
-    examples: [],
+    examples: [
+      "Без типа все становится text — и теперь ты не можешь сделать orders.created_at + interval '1 day', потому что text не складывается с интервалами. И сравнение '2026-05-13' < '2026-5-13' даст true как строки, а не как даты.",
+      "Тип = контракт + индекс-друг. b-tree по integer ищет за O(log n) и сравнивает байты напрямую; b-tree по text ищет так же, но collation добавляет накладные расходы.",
+      "Типизация защищает приложение: если колонка email — domain с CHECK на формат, мусорная строка просто не попадёт в БД, и не нужно проверять на каждом слое выше."
+    ],
     pitfalls: [
       "Хранение чисел в text — частый антипаттерн",
       "Типы влияют на план запроса и индексируемость"
@@ -1730,7 +1758,7 @@ export const topics = {
   },
   "types-boolean": {
     title: "Тип boolean",
-    summary: "TRUE/FALSE/NULL и удобные литералы.",
+    summary: "boolean: TRUE / FALSE / NULL. Совет: NULL boolean — почти всегда симптом плохого моделирования; либо «не знаем» оправдано, либо надо разделить на два булевых.",
     examples: [
       "CREATE TABLE flags (is_active boolean NOT NULL DEFAULT true);\nSELECT * FROM flags WHERE is_active;       -- так короче\nSELECT * FROM flags WHERE is_active = TRUE; -- эквивалентно"
     ],
@@ -2094,7 +2122,7 @@ export const topics = {
   },
   "rel-many-to-many": {
     title: "Связь N:M (многие ко многим)",
-    summary: "Через промежуточную таблицу с двумя FK.",
+    summary: "N:M через промежуточную таблицу с двумя FK и составным PK. Сюда же кладут метаданные связи (created_at, role, quantity).",
     examples: [
       "CREATE TABLE posts (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY);\nCREATE TABLE tags  (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, name text UNIQUE);\n\nCREATE TABLE post_tags (\n  post_id bigint NOT NULL REFERENCES posts(id) ON DELETE CASCADE,\n  tag_id  bigint NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,\n  PRIMARY KEY (post_id, tag_id)\n);\n\nCREATE INDEX idx_post_tags_tag ON post_tags (tag_id);"
     ],
@@ -2265,7 +2293,12 @@ export const topics = {
   "acid": {
     title: "ACID",
     summary: "Atomicity, Consistency, Isolation, Durability — четыре гарантии транзакций.",
-    examples: [],
+    examples: [
+      "Atomicity: BEGIN; UPDATE accounts SET balance = balance - 100 WHERE id = 1; UPDATE accounts SET balance = balance + 100 WHERE id = 2; COMMIT; — если второй UPDATE упадёт, первый откатывается, денег ни у кого не пропадёт.",
+      "Consistency: ограничения (PK, FK, CHECK, UNIQUE) проверяются на COMMIT. Если перевод нарушает CHECK (balance >= 0), вся транзакция откатится — состояние БД остаётся валидным.",
+      "Isolation: две сессии одновременно перевели деньги — в Postgres под READ COMMITTED каждая видит свою «версию» данных, не блокирует читателей. Под SERIALIZABLE — каждая видит как будто работает одна.",
+      "Durability: после COMMIT данные на диске. Postgres делает это через WAL (write-ahead log) + fsync — даже если процесс упадёт через миллисекунду после COMMIT, перезапуск восстановит данные из WAL."
+    ],
     pitfalls: [
       "C из ACID — это не «согласованность распределённой системы», а «не нарушаются ограничения БД»",
       "Isolation в реальности — спектр уровней с разной строгостью",
@@ -2279,7 +2312,7 @@ export const topics = {
   },
   "savepoints": {
     title: "Savepoints — точки сохранения",
-    summary: "Частичный откат внутри транзакции.",
+    summary: "SAVEPOINT — точка внутри транзакции, к которой можно откатиться без отмены всей. Часто используется внутри PL/pgSQL для try-catch.",
     examples: [
       "BEGIN;\n  INSERT INTO orders (...) VALUES (...);\n  SAVEPOINT before_items;\n  INSERT INTO order_items (...) VALUES (...);\n  -- если что-то пошло не так:\n  ROLLBACK TO SAVEPOINT before_items;\n  -- продолжаем работу:\n  INSERT INTO order_items (...) VALUES (...);\nCOMMIT;"
     ],
@@ -2345,7 +2378,12 @@ export const topics = {
   "iso-summary": {
     title: "Итог по уровням изоляции",
     summary: "Сравнительная таблица аномалий и поведения в Postgres.",
-    examples: [],
+    examples: [
+      "READ COMMITTED (default): каждое statement видит свой свежий снимок. Проблемы: non-repeatable read (один и тот же SELECT внутри транзакции может вернуть разное), phantom read.",
+      "REPEATABLE READ: вся транзакция видит снимок на момент начала. Защищает от non-repeatable read и (в Postgres) от phantom read. При конфликте — ошибка serialization_failure, нужно повторить.",
+      "SERIALIZABLE: эквивалент последовательного выполнения. Защищает от write skew (две транзакции читают одно, пишут разное, обе валидны по одиночке, но вместе ломают инвариант). Дороже всех.",
+      "Правило: начинай с READ COMMITTED, поднимай уровень там, где появилась проблема. Не делай SERIALIZABLE «на всякий случай»."
+    ],
     pitfalls: [
       "READ UNCOMMITTED в Postgres = READ COMMITTED",
       "Phantom read в SQL-стандарте отделён от non-repeatable read; в Postgres REPEATABLE READ закрывает оба",
@@ -2483,7 +2521,12 @@ export const topics = {
   "scaling-h-v": {
     title: "Горизонтальное и вертикальное масштабирование",
     summary: "Vertical: больше CPU/RAM/SSD одной машине. Horizontal: больше машин.",
-    examples: [],
+    examples: [
+      "Vertical: тот же сервер, больше CPU/RAM/SSD. Один Postgres-кластер, одна точка администрирования. Потолок — самая большая VM у облака (сейчас ~256 vCPU, ~2 TB RAM).",
+      "Horizontal — replicas: одна primary пишет, несколько replicas читают. Снимает чтение, не снимает запись. Подходит, когда 80% трафика — SELECT.",
+      "Horizontal — sharding: данные разрезаны по ключу (user_id mod 16), несколько primary одновременно. Сложно: cross-shard JOIN, миграция шардов, координация транзакций. Берут, когда vertical и replicas уже выжаты.",
+      "Правило: vertical → replicas → partitioning → sharding. Большинство сервисов навсегда останавливаются на «vertical + 1 replica»."
+    ],
     pitfalls: [
       "Postgres сам по себе — single-master; «горизонтально» — это реплики на чтение и шардирование",
       "Вертикалка проще, но имеет физический потолок и стоит нелинейно дорого",
@@ -2511,7 +2554,12 @@ export const topics = {
   "cap-theorem": {
     title: "CAP / PACELC",
     summary: "При сетевом сбое распределённая система выбирает между Consistency и Availability. PACELC — расширение для штатной работы.",
-    examples: [],
+    examples: [
+      "CAP: при network partition распределённая БД выбирает между C (consistency) и A (availability). Не «обычно», а в момент сбоя сети.",
+      "Postgres в HA-настройке (sync replication + Patroni) — это CP: при потере связи с репликой primary блокирует записи (или отказывает реплике в подтверждении) — целостность важнее доступности.",
+      "Eventually-consistent системы (Cassandra, DynamoDB по умолчанию) — AP: продолжат принимать записи на обеих сторонах, потом разрулят. Подходит, если бизнес терпит расхождения и умеет их мёржить.",
+      "PACELC расширяет: если partition (P) — выбор A или C; else (E) — выбор Latency (L) или Consistency (C). Постгрес-репликации обычно EL/CP: в норме оптимизируют латенси за счёт строгой согласованности."
+    ],
     pitfalls: [
       "Postgres-кластер с синхронной репликацией — CP при отказе реплики; асинхронной — CA для чтений на реплике с возможной устаревшей видимостью",
       "C из CAP — не C из ACID. Это linearizability, не «целостность ограничений»",
@@ -2566,7 +2614,12 @@ export const topics = {
   "oltp-olap": {
     title: "OLTP и OLAP",
     summary: "Транзакционные системы (много мелких операций) и аналитические (тяжёлые SELECT).",
-    examples: [],
+    examples: [
+      "OLTP: «найти заказ по id, обновить статус» — миллионы коротких операций в секунду. Профиль: точечные SELECT + UPDATE по PK/FK, индексы решают всё.",
+      "OLAP: «сколько мы заработали в каждой стране по дням за год» — десятки тысяч операций, но каждая читает миллионы строк. Профиль: GROUP BY, агрегаты, JOIN больших таблиц, индексы помогают слабо.",
+      "Postgres покрывает оба, но плохо ставить тяжёлые отчёты рядом с OLTP — отчёт «съест» работу планировщику. Решение: отдельная read-replica под отчёты или отдельный аналитический warehouse (ClickHouse, BigQuery).",
+      "HTAP — попытка совместить оба в одной БД. Реальная практика — всё-таки разделять, потому что профили нагрузки слишком разные."
+    ],
     pitfalls: [
       "PostgreSQL — отличный OLTP; для тяжёлой аналитики чаще берут колоночные store-ы (ClickHouse, DuckDB) или специализированные хранилища",
       "Часто ставят реплику Postgres под аналитические запросы, чтобы не мешать продовому OLTP",
@@ -2687,7 +2740,12 @@ export const topics = {
   "sqlite-comparison": {
     title: "SQLite vs PostgreSQL",
     summary: "Когда хватит SQLite, а когда нужен Postgres.",
-    examples: [],
+    examples: [
+      "SQLite: embedded, один файл, без сервера. Идеально для desktop-приложений, мобильных, тестов, локальных утилит. Поддерживает SQL-92 с расширениями.",
+      "Postgres: клиент-сервер, многопользовательский, ACID на уровне продакшна, расширения (PostGIS, pg_trgm, fdw), репликация. Нужен отдельный процесс / контейнер / сервис.",
+      "Когда SQLite ок: один писатель, до ~миллиона записей, не требуется сетевой доступ. Когда нужен Postgres: одновременные писатели, дальше развитие, веб-приложение, нужны типы вроде jsonb или array.",
+      "Миграция SQLite → Postgres почти всегда «не сейчас» — но она будет проще, если изначально не используешь SQLite-специфичные фичи (типы AUTOINCREMENT, datetime через text)."
+    ],
     pitfalls: [
       "SQLite — встраиваемая, файл на диске; писатель один за раз",
       "Postgres — клиент-сервер, конкурентные writers, расширения, репликация",
@@ -2714,7 +2772,12 @@ export const topics = {
   "dec-index": {
     title: "Какой индекс выбрать",
     summary: "Дерево решений для подбора индекса под запрос.",
-    examples: [],
+    examples: [
+      "Дерево решений: запрос с равенством по 1 столбцу + сортировкой → b-tree на (eq_col, sort_col). Запрос ILIKE '%foo%' → gin_trgm_ops. JSONB-поиск по @> → GIN.",
+      "Range-запрос (created_at BETWEEN ...) на гигантской упорядоченной таблице → BRIN. Полнотекст → GIN на tsvector. «Найти ближайший геометрически» → GiST.",
+      "Скрытый совет: иногда лучший индекс — partial. WHERE status = 'pending' и пишут только в pending-строки 1% времени → CREATE INDEX … WHERE status = 'pending' гораздо компактнее и быстрее.",
+      "Когда индекс не нужен: маленькая таблица (<10k строк) или сильно неселективный предикат (status = 'active' и таких 90% строк)."
+    ],
     pitfalls: ["Композитный индекс работает по leftmost prefix", "GIN/jsonb_path_ops — только для @>"],
     learningGoals: [
       "сопоставлять запрос и тип индекса (b-tree / GIN / BRIN / hash)",
@@ -2725,7 +2788,12 @@ export const topics = {
   "dec-isolation": {
     title: "Какой уровень изоляции выбрать",
     summary: "READ COMMITTED / REPEATABLE READ / SERIALIZABLE.",
-    examples: [],
+    examples: [
+      "READ COMMITTED — дефолт. Берёшь, если транзакция короткая и не требует «увидеть всё то же самое второй раз внутри себя».",
+      "REPEATABLE READ — берёшь, если внутри одной транзакции делаешь несколько SELECT и не хочешь, чтобы ответы между ними изменились. Хорошо для отчётов и сложных вычислений.",
+      "SERIALIZABLE — берёшь там, где есть инвариант, который ломается параллельной транзакцией (классический write skew: «врачей в смене не меньше двух»). Готовься обрабатывать serialization_failure и повторять транзакцию.",
+      "Правило: начинай с READ COMMITTED, поднимай уровень там, где появилась гонка. Не «на всякий случай»."
+    ],
     pitfalls: ["SERIALIZABLE может бросать 40001 — приложение должно ретраить", "Lost update лечится FOR UPDATE, а не более высоким уровнем"],
     learningGoals: [
       "выбирать минимально достаточный уровень изоляции",
@@ -2735,8 +2803,13 @@ export const topics = {
   },
   "dec-id-type": {
     title: "Какой тип ID для PK",
-    summary: "bigint identity vs UUID v4 vs UUID v7.",
-    examples: [],
+    summary: "Выбор между bigint identity (компактно, монотонно), UUID v4 (рандом, фрагментирует индекс) и UUID v7 (рандом + время, лучшее из двух миров).",
+    examples: [
+      "bigint identity: 8 байт, монотонный, идеален для b-tree, видно «как давно создано». Минус — нужно roundtrip к БД для получения id (если генерится в БД).",
+      "UUID v4: случайный, 16 байт. Можно генерить на клиенте без roundtrip. Минус: фрагментирует b-tree, индексы пухнут, ID непредсказуемы — что иногда плюс (защита от перебора), иногда минус.",
+      "UUID v7: timestamp + random в 128 бит. Локально упорядочен, генерится на клиенте — лучшие свойства обоих миров. Стандартизован, поддержка в библиотеках растёт.",
+      "Правило: внутренний сервис без публичных id → bigint identity. API с публичными id, которые не должны угадываться → UUID v7. UUID v4 → если уже legacy."
+    ],
     pitfalls: ["UUID v4 рассыпает индекс случайно — медленнее вставки", "money тип в Postgres — антипаттерн"],
     learningGoals: [
       "выбирать ID под предсказуемость, видимость и распределённость",
@@ -2747,7 +2820,12 @@ export const topics = {
   "dec-partition-shard": {
     title: "Партиционирование vs шардинг",
     summary: "Когда хватит partition, а когда нужен шардинг.",
-    examples: [],
+    examples: [
+      "Partitioning: одна БД, одна primary; таблица events разделена на events_2026_05 / events_2026_06 / … по ts. Старые партиции дропаются мгновенно. Размер БД: единицы TB.",
+      "Sharding: несколько отдельных БД-кластеров; данные разрезаны по ключу (например, user_id mod 16). Каждый кластер самостоятельный. Размер: десятки-сотни TB, или нагрузка превышает один сервер.",
+      "Между ними: реплики. Primary + 3 read-replicas снимут 80% чтений и часто хватает до серьёзных масштабов.",
+      "Шардинг — это не «следующий шаг после партиций». Шардинг ломает JOIN, миграции, транзакции. Берёшь его только когда vertical, replicas и partitioning уже исчерпаны."
+    ],
     pitfalls: ["Шардинг — дорого; индексы и партиции часто решают", "PARTITION BY RANGE/LIST помогает с DROP старых данных"],
     learningGoals: [
       "оценивать масштабы прежде, чем тянуться к шардингу",
@@ -2770,7 +2848,7 @@ export const topics = {
   // ===== copy.html =====
   "copy-formats": {
     title: "Форматы COPY: TEXT, CSV, BINARY",
-    summary: "Три формата с разными свойствами.",
+    summary: "TEXT — компактен, по умолчанию. CSV — для интероп с Excel/таблицами. BINARY — самый быстрый, но не читается глазами и не переносим между архитектурами.",
     examples: [
       "COPY users FROM '/tmp/users.csv' WITH (FORMAT csv, HEADER);",
       "COPY orders TO '/tmp/orders.bin' WITH (FORMAT binary);"
@@ -2835,8 +2913,13 @@ export const topics = {
   },
   "copy-vs-pgdump": {
     title: "COPY vs pg_dump",
-    summary: "Какой инструмент для какой задачи.",
-    examples: [],
+    summary: "COPY — про одну таблицу без схемы (быстрая загрузка). pg_dump — про целую БД со схемой, индексами, FK и владельцами. Сценарии не пересекаются.",
+    examples: [
+      "COPY: про одну таблицу, без схемы. Очень быстро, потоковый ввод/вывод, формат TEXT / CSV / BINARY. Не сохраняет индексы / триггеры / FK.",
+      "pg_dump: про целую БД (или её часть). Сохраняет DDL, последовательности, разрешения, владельцев. Формат plain (читаемый), custom (-Fc, для pg_restore), directory (-Fd, параллельный).",
+      "Сценарий «загрузить 50M строк из CSV в существующую таблицу» — COPY. Сценарий «перенести БД на новый сервер» — pg_dump -Fc + pg_restore -j 8.",
+      "Гибрид: pg_dump --schema-only для DDL + COPY на каждую таблицу — позволяет параллелить переезд гигантских БД, когда стандартный pg_restore не справляется."
+    ],
     pitfalls: [
       "pg_dump — структура + данные одной БД; COPY — только данные",
       "pg_restore -j параллелит данные и индексы; COPY однопоточный"
@@ -2868,7 +2951,7 @@ export const topics = {
   },
   "jsonb-jsonpath": {
     title: "JSONPath: jsonb_path_query и @@",
-    summary: "Стандартный язык запросов внутри jsonb.",
+    summary: "JSONPath (@@, @?) — стандартный язык запросов внутри jsonb. Похож на XPath: «найди всех пользователей, у которых tag = 'pro' и at least one orders.total > 100».",
     examples: [
       "SELECT * FROM docs WHERE data @@ '$.priority > 5';",
       "SELECT jsonb_path_query(data, '$.items[*].sku') FROM docs;"
@@ -2913,7 +2996,7 @@ export const topics = {
   },
   "win-frames": {
     title: "Кадры окна: ROWS / RANGE / GROUPS",
-    summary: "Что попадает в кадр расчёта функции.",
+    summary: "Frame — окно строк, по которым считается оконная функция. ROWS BETWEEN n PRECEDING AND CURRENT ROW для скользящего среднего, RANGE для интервалов значений.",
     examples: [
       "ROWS BETWEEN 2 PRECEDING AND CURRENT ROW",
       "RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW",
@@ -2929,7 +3012,7 @@ export const topics = {
   },
   "win-lag-lead": {
     title: "LAG / LEAD",
-    summary: "Заглянуть на N строк назад/вперёд.",
+    summary: "LAG(x, n) даёт значение x из n строк назад внутри окна, LEAD — на n вперёд. Базовый инструмент для diff-ов «по сравнению с прошлым месяцем».",
     examples: [
       "lag(total) OVER (PARTITION BY user_id ORDER BY created_at)",
       "lead(created_at) OVER (...)"
@@ -2943,7 +3026,7 @@ export const topics = {
   },
   "win-first-last-value": {
     title: "FIRST_VALUE / LAST_VALUE / NTH_VALUE",
-    summary: "Первая / последняя / N-я строка кадра.",
+    summary: "FIRST_VALUE / LAST_VALUE / NTH_VALUE — взять значение из конкретной позиции окна. Внимание: LAST_VALUE без явного frame даёт текущую строку, а не последнюю.",
     examples: [
       "first_value(id) OVER (PARTITION BY user_id ORDER BY created_at ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)"
     ],
@@ -3000,7 +3083,7 @@ export const topics = {
   },
   "win-dedupe": {
     title: "Dedupe — оставить одну строку из дубликатов",
-    summary: "Удалить дубли, сохранив самую свежую.",
+    summary: "Оставить из набора дублей одну запись (самую свежую, самую полную). ROW_NUMBER() OVER (PARTITION BY ключ ORDER BY критерий) + WHERE rn = 1.",
     examples: [
       "WITH ranked AS (SELECT id, row_number() OVER (PARTITION BY lower(email) ORDER BY created_at DESC) rn FROM users)\nDELETE FROM users u USING ranked r WHERE u.id = r.id AND r.rn > 1;"
     ],
@@ -3057,7 +3140,7 @@ export const topics = {
   },
   "sr-replication-slots": {
     title: "Replication slots, wal_keep_size",
-    summary: "Гарантия сохранения WAL для подписчика.",
+    summary: "Слот — запрос реплики «держи WAL, пока я не догоню». Без слота реплика отстаёт и навсегда теряется; со слотом — primary держит WAL, заброшенный слот забивает диск.",
     examples: [
       "SELECT pg_create_physical_replication_slot('replica1');",
       "SELECT slot_name, slot_type, active, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal FROM pg_replication_slots;"
@@ -3104,7 +3187,7 @@ export const topics = {
   },
   "sr-pgrestore-parallel": {
     title: "pg_restore -j: параллельное восстановление",
-    summary: "Ускоряем восстановление большой БД.",
+    summary: "pg_restore -j N разворачивает таблицы и индексы из custom/directory-дампа в N потоков. Самый дешёвый способ ускорить восстановление большой БД.",
     examples: [
       "pg_restore -d app -j 8 /backup/app.dump",
       "pg_restore -d app --section=pre-data /backup/app.dump\npg_restore -d app --section=data -j 8 /backup/app.dump\npg_restore -d app --section=post-data -j 8 /backup/app.dump"
@@ -3150,7 +3233,12 @@ export const topics = {
   "sr-recovery-checklist": {
     title: "Чек-лист восстановления",
     summary: "Порядок действий при инциденте: фиксация → план → изоляция → restore → проверка → переключение → postmortem.",
-    examples: [],
+    examples: [
+      "Час Х: упало в 14:32, кто-то заметил в 14:45. Первое — НЕ трогать прод до плана. Второе — определить: что упало (одна таблица? кластер? сеть?), что надо вернуть (данные? сервис? оба?), куда (тот же сервер? новый?).",
+      "Не разворачивай восстановление поверх кривого прода — потеряешь и его. Всегда новое окружение: staging-сервер, новый каталог, новый кластер.",
+      "PITR (point-in-time recovery): pgbackrest restore --target='2026-05-13 14:30:00' --type=time — раскатать состояние на минуту до инцидента. Требует архивации WAL и предыдущего полного бэкапа.",
+      "После восстановления — обязательная проверка целостности (SELECT count(*) по ключевым таблицам, последние транзакции, чек-сы) и только потом переключение трафика. И постмортем."
+    ],
     pitfalls: [
       "Не лей restore поверх боевого $PGDATA — потеряешь и текущее состояние",
       "Перед любыми правками — снимок «места преступления» (логи, $PGDATA)",
@@ -3163,7 +3251,7 @@ export const topics = {
   // ===== tuning.html =====
   "cfg-shared-buffers": {
     title: "shared_buffers",
-    summary: "Размер буфер-пула Postgres.",
+    summary: "Размер буфер-пула Postgres — внутреннего кеша страниц. Дефолт 128 МБ; на проде ставят 25% RAM. Слишком большое значение конкурирует с ОС-кешем.",
     examples: [
       "SHOW shared_buffers;",
       "shared_buffers = 8GB"
@@ -3193,7 +3281,7 @@ export const topics = {
   },
   "cfg-effective-cache-size": {
     title: "effective_cache_size",
-    summary: "Подсказка планировщику о размере кеша.",
+    summary: "Подсказка планировщику о том, сколько памяти доступно под кеш (Postgres + ОС суммарно). Не выделяет память — только влияет на оценку стоимости плана.",
     examples: [
       "effective_cache_size = 24GB"
     ],

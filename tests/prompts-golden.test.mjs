@@ -20,6 +20,8 @@ function snapshot(prompt) {
     hasGoals: /Цели обучения по этой теме/.test(prompt),
     hasExamples: /Опорные SQL-примеры/.test(prompt),
     hasPitfalls: /Типичные подводные камни этой темы/.test(prompt),
+    hasMisconception: /Распространённое заблуждение/.test(prompt),
+    hasNextStep: /Куда это ведёт/.test(prompt),
   };
 }
 
@@ -31,6 +33,8 @@ const expectedTopic = {
   hasGoals: true,
   hasExamples: true,
   hasPitfalls: true,
+  hasMisconception: true,
+  hasNextStep: true,
 };
 
 const sampleTopics = [
