@@ -5,40 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Транзакции и изоляция — PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=18"></script>
+<script type="module" src="assets/app.js?v=20260513"></script>
 </head>
 <body>
 <div class="layout">
-  <aside class="sidebar">
-    <h1>PostgreSQL Tutor</h1>
-    <div class="tag">Локальный учебник</div>
-    <ul class="nav">
-      <li><a href="basics.html">Основы</a></li>
-      <li><a href="install.html">Установка</a></li>
-      <li><a href="cheatsheet.html">Шпаргалка</a></li>
-      <li><a href="types.html">Типы данных</a></li>
-      <li><a href="joins.html">Соединения</a></li>
-      <li><a href="aggregates.html">Агрегации</a></li>
-      <li><a href="window.html">Оконные функции</a></li>
-      <li><a href="transactions.html">Транзакции</a></li>
-      <li><a href="indexes.html">Индексы</a></li>
-      <li><a href="copy.html">COPY и загрузка</a></li>
-      <li><a href="scaling.html">Масштабирование</a></li>
-      <li><a href="programming.html">Программирование</a></li>
-      <li><a href="security.html">Безопасность</a></li>
-      <li><a href="tuning.html">Конфигурация и тюнинг</a></li>
-      <li><a href="decisions.html">Что выбрать</a></li>
-      <li><a href="tooling.html">Тулинг</a></li>
-      <li><a href="errors.html">Частые ошибки</a></li>
-      <li><a href="senior.html">Senior-уровень</a></li>
-      <li class="group-title">Гайды</li>
-      <li><a href="guides/list-tables.html">Список таблиц</a></li>
-      <li><a href="guides/create-table.html">Создание таблицы</a></li>
-      <li><a href="guides/vacuum.html">VACUUM</a></li>
-      <li><a href="guides/list-users.html">Список пользователей</a></li>
-      <li><a href="guides/create-index.html">Создание индекса</a></li>
-    </ul>
-  </aside>
+  <aside class="sidebar"></aside>
   <main class="main">
     <div class="topbar">
       <div class="crumbs">PostgreSQL · Транзакции</div>
@@ -237,7 +208,94 @@ COMMIT;
     </section>
 
     <section class="category">
-      <h2>5. Где ещё про транзакции</h2>
+      <h2>5. Конкурентность и согласованность</h2>
+      <p class="sub">Когда несколько соединений одновременно меняют одни и те же данные, нужны механизмы согласованности поверх просто транзакций. Здесь — MVCC, advisory locks, шина событий внутри БД и outbox-паттерн.</p>
+
+      <article class="topic" id="sr-mvcc-snapshot">
+        <h3>MVCC и снимки</h3>
+        <p class="summary">xmin/xmax и видимость строк.</p>
+        <div class="code-block">
+          <pre>SELECT xmin, xmax, * FROM users WHERE id = 1;
+
+SELECT txid_current(), pg_current_snapshot();
+
+-- найти долгие активные транзакции (тормозят VACUUM):
+SELECT pid, age(now(), xact_start) AS age, state, query
+FROM   pg_stat_activity
+WHERE  state &lt;&gt; 'idle'
+ORDER  BY xact_start NULLS LAST
+LIMIT  10;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-mvcc-snapshot">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-advisory-locks">
+        <h3>Advisory locks — прикладные блокировки</h3>
+        <p class="summary">Один воркер на задачу без отдельной таблицы-замка.</p>
+        <div class="code-block">
+          <pre>-- транзакционная: снимется на COMMIT/ROLLBACK
+SELECT pg_try_advisory_xact_lock(hashtext('cron:nightly'));
+
+-- сессионная: нужно явно отпустить
+SELECT pg_advisory_lock(42);
+-- ... работа ...
+SELECT pg_advisory_unlock(42);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-advisory-locks">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-listen-notify">
+        <h3>LISTEN / NOTIFY</h3>
+        <p class="summary">Лёгкая шина событий внутри Postgres.</p>
+        <div class="code-block">
+          <pre>-- подписчик:
+LISTEN order_created;
+
+-- издатель:
+NOTIFY order_created, '{"id": 42}';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-listen-notify">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Сообщения не сохраняются: пропустил подключение — пропустил событие. Хорошо для cache-invalidation; плохо для гарантированной доставки.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-outbox">
+        <h3>Транзакционный outbox</h3>
+        <p class="summary">Атомарность бизнес-операции и публикации события наружу.</p>
+        <div class="code-block">
+          <pre>BEGIN;
+  INSERT INTO orders (user_id, total) VALUES ($1, $2) RETURNING id;
+  INSERT INTO outbox (topic, payload)
+    VALUES ('order_created', jsonb_build_object('id', currval('orders_id_seq')));
+COMMIT;
+
+-- воркер забирает события:
+SELECT id, topic, payload
+FROM   outbox
+WHERE  published_at IS NULL
+ORDER  BY id
+LIMIT  100
+FOR UPDATE SKIP LOCKED;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-outbox">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Где ещё про транзакции</h2>
       <p class="sub">Эти темы уже есть на других страницах.</p>
       <article class="topic concept">
         <h3>Связанные темы</h3>
@@ -245,8 +303,6 @@ COMMIT;
           <ul>
             <li><strong>Транзакции на практике</strong> — на главной, тема <a href="cheatsheet.html#transactions">«Транзакции и уровни изоляции»</a>.</li>
             <li><strong>Блокировки строк</strong> — на главной, <a href="cheatsheet.html#locks">«FOR UPDATE SKIP LOCKED»</a>.</li>
-            <li><strong>MVCC и снимки</strong> — на странице <a href="senior.html#sr-mvcc-snapshot">Senior-уровня</a>.</li>
-            <li><strong>Advisory locks</strong> — там же, <a href="senior.html#sr-advisory-locks">«Advisory locks»</a>.</li>
             <li><strong>Серилизационные ошибки</strong> — на странице <a href="errors.html#err-serialization">«Частые ошибки»</a>.</li>
           </ul>
         </div>

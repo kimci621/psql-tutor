@@ -100,6 +100,10 @@ function resolvePath(page) {
   return page;
 }
 
+export function openSearch() {
+  open();
+}
+
 function open() {
   if (!overlayEl) return;
   overlayEl.classList.add("open");

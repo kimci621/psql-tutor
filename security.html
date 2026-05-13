@@ -5,40 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Безопасность PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=18"></script>
+<script type="module" src="assets/app.js?v=20260513"></script>
 </head>
 <body>
 <div class="layout">
-  <aside class="sidebar">
-    <h1>PostgreSQL Tutor</h1>
-    <div class="tag">Локальный учебник</div>
-    <ul class="nav">
-      <li><a href="basics.html">Основы</a></li>
-      <li><a href="install.html">Установка</a></li>
-      <li><a href="cheatsheet.html">Шпаргалка</a></li>
-      <li><a href="types.html">Типы данных</a></li>
-      <li><a href="joins.html">Соединения</a></li>
-      <li><a href="aggregates.html">Агрегации</a></li>
-      <li><a href="window.html">Оконные функции</a></li>
-      <li><a href="transactions.html">Транзакции</a></li>
-      <li><a href="indexes.html">Индексы</a></li>
-      <li><a href="copy.html">COPY и загрузка</a></li>
-      <li><a href="scaling.html">Масштабирование</a></li>
-      <li><a href="programming.html">Программирование</a></li>
-      <li><a href="security.html">Безопасность</a></li>
-      <li><a href="tuning.html">Конфигурация и тюнинг</a></li>
-      <li><a href="decisions.html">Что выбрать</a></li>
-      <li><a href="tooling.html">Тулинг</a></li>
-      <li><a href="errors.html">Частые ошибки</a></li>
-      <li><a href="senior.html">Senior-уровень</a></li>
-      <li class="group-title">Гайды</li>
-      <li><a href="guides/list-tables.html">Список таблиц</a></li>
-      <li><a href="guides/create-table.html">Создание таблицы</a></li>
-      <li><a href="guides/vacuum.html">VACUUM</a></li>
-      <li><a href="guides/list-users.html">Список пользователей</a></li>
-      <li><a href="guides/create-index.html">Создание индекса</a></li>
-    </ul>
-  </aside>
+  <aside class="sidebar"></aside>
   <main class="main">
     <div class="topbar">
       <div class="crumbs">PostgreSQL · Безопасность</div>
@@ -219,7 +190,7 @@ WHERE  table_name = 'orders';</pre>
             <li>Без <code>USAGE ON SCHEMA</code> ни <code>SELECT</code> на таблицу не сработает — это частая ловушка.</li>
             <li><code>ALTER DEFAULT PRIVILEGES</code> назначает права на ещё не созданные объекты. Назначай от имени владельца таблиц.</li>
             <li><code>GRANT … ON ALL TABLES IN SCHEMA</code> — одноразовый снимок: новые таблицы прав не получат, для них нужен <code>ALTER DEFAULT PRIVILEGES</code>.</li>
-            <li>Для row-level granularity — Row-Level Security (см. <a href="senior.html#sr-rls">RLS на senior-уровне</a>).</li>
+            <li>Для row-level granularity — <a href="#sr-rls">Row-Level Security</a> ниже на этой же странице.</li>
           </ul>
         </div>
       </article>
@@ -303,15 +274,87 @@ SELECT * FROM pg_stat_activity WHERE state = 'active';</pre>
     </section>
 
     <section class="category">
-      <h2>5. Связанные темы</h2>
+      <h2>5. Доступы внутри БД</h2>
+      <p class="sub">Аутентификация и роли решают «кто пришёл». Дальше — что ему видно и можно. Здесь — row-level политики, безопасные функции и параметризованные запросы как защита от инъекций.</p>
+
+      <article class="topic" id="sr-rls">
+        <h3>Row-Level Security</h3>
+        <p class="summary">Политики доступа на уровне строк — основа multi-tenant.</p>
+        <div class="code-block">
+          <pre>ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation ON documents
+  USING      (tenant_id = current_setting('app.tenant_id')::bigint)
+  WITH CHECK (tenant_id = current_setting('app.tenant_id')::bigint);
+
+-- Из приложения перед запросами арендатора:
+SET app.tenant_id = '42';</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-rls">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Владелец таблицы и суперпользователь обходят RLS. Чтобы они тоже подчинялись политикам — <code>ALTER TABLE … FORCE ROW LEVEL SECURITY</code>.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-security-definer">
+        <h3>Безопасные SECURITY DEFINER-функции</h3>
+        <p class="summary">Функция выполняется с правами своего владельца.</p>
+        <div class="code-block">
+          <pre>CREATE OR REPLACE FUNCTION audit_log(msg text)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  INSERT INTO audit (msg, who, ts) VALUES (msg, current_user, now());
+$$;
+
+REVOKE ALL ON FUNCTION audit_log(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION audit_log(text) TO app_user;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-security-definer">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Без <code>SET search_path</code> вызывающий может подменить функцию из своей схемы — это классический вектор повышения привилегий.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-prepared-statements">
+        <h3>Prepared statements и SQL-инъекции</h3>
+        <p class="summary">Параметризация — и защита, и кэш плана.</p>
+        <div class="code-block">
+          <pre>PREPARE p (bigint) AS
+  SELECT id, total FROM orders WHERE user_id = $1;
+
+EXECUTE p (42);
+DEALLOCATE p;
+
+-- В приложении используй placeholders драйвера ($1, ?), никогда не клей строки SQL.</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-prepared-statements">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>После 5+ выполнений Postgres может перейти на <em>generic plan</em>. Иногда это хуже custom-плана с конкретными значениями — проверяй на тяжёлых запросах.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Связанные темы</h2>
       <article class="topic concept">
         <h3>Где ещё про безопасность</h3>
         <div class="desc">
           <ul>
-            <li><a href="senior.html#sr-rls">Row-Level Security</a> — политики доступа к строкам.</li>
-            <li><a href="senior.html#sr-security-definer">SECURITY DEFINER</a> — функции, выполняющиеся с правами владельца.</li>
             <li><a href="programming.html#raise-using">RAISE … USING</a> — не клади секреты в текст ошибки.</li>
             <li><a href="programming.html#dynamic-sql">Динамический SQL</a> — про защиту от SQL injection.</li>
+            <li><a href="app-integration.html#sr-observability">Наблюдаемость</a> — алерты на подозрительную активность.</li>
           </ul>
         </div>
       </article>

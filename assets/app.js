@@ -4,7 +4,8 @@ import { loadTheme, saveTheme, watchSystemTheme } from "./settings.js";
 import { findTrackContext, resolveHref, tracks } from "./tracks.js?v=2";
 import { initExercises } from "./exercises.js?v=1";
 import { initProgressControls, initSidebarProgress } from "./progress.js?v=1";
-import { initSearch } from "./search.js?v=1";
+import { initSearch, openSearch } from "./search.js?v=2";
+import { renderSidebar } from "./sidebar.js?v=1";
 import { initTOC } from "./toc.js?v=1";
 import { initQuizzes } from "./quiz.js?v=1";
 import { topics } from "./topics.js";
@@ -359,8 +360,24 @@ if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
   });
 }
 
+function injectSidebar() {
+  const sidebar = document.querySelector("aside.sidebar");
+  if (!sidebar) return;
+  // Если в HTML остался старый статический сайдбар — выкидываем его и подменяем
+  // на единый сгенерированный. Это убирает drift между HTML-файлами.
+  sidebar.innerHTML = renderSidebar(currentPagePath());
+  const btn = sidebar.querySelector(".sidebar-search");
+  if (btn) {
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      openSearch();
+    });
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   injectChatPanel();
+  injectSidebar();
   initTheme();
   initCodeBlocks();
   initActiveNav();

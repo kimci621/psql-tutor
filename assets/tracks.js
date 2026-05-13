@@ -1,55 +1,48 @@
 // Учебные треки. Каждый трек — упорядоченный список страниц.
 // Используется лендингом (index.html) для отрисовки карточек,
 // а также блоком «Дальше / Назад» внизу каждой страницы.
+//
+// Раньше было три трека (Junior/Middle/Senior). Уровневые ярлыки убраны,
+// темы senior-уровня распределены по тематическим разделам. Сейчас два трека —
+// «Основы SQL» (язык, схема, чтение данных) и «Прод и эксплуатация» (то, что
+// нужно, чтобы запустить и удерживать БД в проде).
 
 export const tracks = [
   {
-    id: 'junior',
-    title: 'Junior с нуля',
-    summary: 'Поставить PostgreSQL, разобраться с psql, написать первый CREATE TABLE и SELECT, понять JOIN и агрегации.',
-    level: 'Старт',
-    estimate: '1–2 недели',
+    id: 'fundamentals',
+    title: 'Основы SQL',
+    summary: 'Поставить PostgreSQL, разобраться с psql, написать первый CREATE TABLE и SELECT, понять JOIN, агрегации, оконные функции, индексы и транзакции.',
+    level: 'Учебный путь',
+    estimate: '2–4 недели',
     pages: [
       { href: 'install.html', title: 'Установка PostgreSQL' },
       { href: 'basics.html', title: 'Основы SQL и psql' },
       { href: 'types.html', title: 'Типы данных' },
-      { href: 'cheatsheet.html', title: 'Шпаргалка по командам' }, // ранее index.html
       { href: 'joins.html', title: 'Соединения (JOIN)' },
       { href: 'aggregates.html', title: 'Агрегации и GROUP BY' },
-      { href: 'guides/list-tables.html', title: 'Гайд: список таблиц' },
-      { href: 'guides/create-table.html', title: 'Гайд: создание таблицы' },
-      { href: 'guides/list-users.html', title: 'Гайд: список пользователей' }
-    ]
-  },
-  {
-    id: 'middle',
-    title: 'Middle',
-    summary: 'Транзакции, изоляция, индексы, оптимизация, обслуживание, типичные ошибки и инструменты разработчика.',
-    level: 'Развитие',
-    estimate: '2–4 недели',
-    pages: [
-      { href: 'transactions.html', title: 'Транзакции и блокировки' },
       { href: 'window.html', title: 'Оконные функции' },
       { href: 'indexes.html', title: 'Индексы' },
-      { href: 'guides/create-index.html', title: 'Гайд: создание индекса' },
-      { href: 'guides/vacuum.html', title: 'Гайд: VACUUM' },
-      { href: 'copy.html', title: 'COPY и массовая загрузка' },
-      { href: 'programming.html', title: 'Программирование на стороне БД' },
-      { href: 'errors.html', title: 'Частые ошибки' },
-      { href: 'tooling.html', title: 'Тулинг' }
+      { href: 'transactions.html', title: 'Транзакции и блокировки' },
+      { href: 'programming.html', title: 'Программирование на стороне БД' }
     ]
   },
   {
-    id: 'senior',
-    title: 'Senior',
-    summary: 'Планировщик и EXPLAIN, миграции без даунтайма, пулинг, репликация, бэкапы, безопасность, RLS.',
-    level: 'Прод и эксплуатация',
+    id: 'operations',
+    title: 'Прод и эксплуатация',
+    summary: 'EXPLAIN и планировщик, тюнинг, репликация, бэкапы и PITR, миграции без даунтайма, безопасность и доступы, интеграция Postgres с приложением.',
+    level: 'Прикладной путь',
     estimate: '4+ недель',
     pages: [
-      { href: 'scaling.html', title: 'Масштабирование' },
-      { href: 'security.html', title: 'Безопасность' },
       { href: 'tuning.html', title: 'Конфигурация и тюнинг' },
-      { href: 'senior.html', title: 'Senior-уровень: производительность и прод' }
+      { href: 'performance.html', title: 'EXPLAIN и планировщик' },
+      { href: 'scaling.html', title: 'Масштабирование и партиции' },
+      { href: 'replication.html', title: 'Репликация' },
+      { href: 'backups.html', title: 'Бэкапы и восстановление' },
+      { href: 'migrations.html', title: 'Миграции без даунтайма' },
+      { href: 'copy.html', title: 'COPY и массовая загрузка' },
+      { href: 'security.html', title: 'Безопасность и доступы' },
+      { href: 'app-integration.html', title: 'Postgres из приложения' },
+      { href: 'tooling.html', title: 'Тулинг' }
     ]
   }
 ];

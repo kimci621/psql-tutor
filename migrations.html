@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Миграции без даунтайма — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=20260513"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Миграции без даунтайма</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Миграции без даунтайма</h1>
+    <p class="page-lead">
+      В проде нельзя просто «дать ALTER TABLE и пойти спать». Любая блокировка таблицы под
+      нагрузкой выстраивает за собой очередь транзакций и кладёт сервис. Эта страница —
+      про дисциплинированный паттерн миграций, при котором схема и код движутся
+      шаг за шагом, без окон обслуживания.
+    </p>
+
+    <section class="category">
+      <h2>Паттерн expand → backfill → contract</h2>
+      <p class="sub">Любое сложное изменение разбивается на три фазы. Сначала добавляем новое рядом со старым, потом плавно переносим данные, потом убираем старое. На каждой фазе сервис продолжает работать.</p>
+
+      <article class="topic" id="sr-zero-downtime-migrations">
+        <h3>Безопасные миграции без даунтайма</h3>
+        <p class="summary">Паттерн <strong>expand → backfill → contract</strong>.</p>
+        <div class="code-block">
+          <pre>-- 1. expand: добавляем новый столбец, код пишет в оба
+ALTER TABLE users ADD COLUMN email_norm text;
+
+-- 2. backfill маленькими батчами
+UPDATE users SET email_norm = lower(email)
+WHERE  id BETWEEN $1 AND $2 AND email_norm IS NULL;
+
+-- 3. ограничения через NOT VALID, потом VALIDATE (без долгой блокировки)
+ALTER TABLE users
+  ADD CONSTRAINT users_email_norm_nn CHECK (email_norm IS NOT NULL) NOT VALID;
+ALTER TABLE users VALIDATE CONSTRAINT users_email_norm_nn;
+
+-- 4. contract: код переходит на email_norm, старый столбец дропается</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-zero-downtime-migrations">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Любой <code>ALTER TABLE</code> с <em>ACCESS EXCLUSIVE</em> выстраивает за собой очередь. Совмести с <code>SET lock_timeout = '2s';</code> — лучше упасть и повторить, чем заморозить прод.</p>
+        </div>
+      </article>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

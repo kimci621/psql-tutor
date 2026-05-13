@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Postgres из приложения — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=20260513"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Postgres из приложения</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Postgres из приложения</h1>
+    <p class="page-lead">
+      БД редко существует сама по себе — обычно её дёргает веб-приложение через
+      ORM или драйвер, и большая часть проблем в проде растёт именно отсюда.
+      Эта страница — про типичные ловушки интеграции Postgres с приложением:
+      ORM против raw SQL, N+1, и что мониторить со стороны БД.
+    </p>
+
+    <section class="category">
+      <h2>ORM и raw SQL</h2>
+      <p class="sub">ORM хорош для простых случаев и плох для тяжёлых отчётов. Здесь — про границу между ними.</p>
+
+      <article class="topic" id="sr-app-orm">
+        <h3>ORM vs raw SQL</h3>
+        <p class="summary">Когда ORM помогает, а когда мешает.</p>
+        <div class="code-block">
+          <pre>-- N+1 в ORM:
+-- users.forEach(u =&gt; orm.orders.find({ where: { userId: u.id } }))
+--   → 1 + N запросов
+
+-- решение 1: eager-load / include
+-- решение 2: один JOIN/CTE на стороне БД
+
+WITH u AS (
+  SELECT id, email FROM users WHERE is_active
+)
+SELECT u.email, json_agg(o.* ORDER BY o.created_at DESC) FILTER (WHERE o.id IS NOT NULL) AS orders
+FROM   u
+LEFT JOIN orders o ON o.user_id = u.id
+GROUP  BY u.email;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-app-orm">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Включай в драйвере логирование SQL хотя бы в dev-окружении — иначе ORM незаметно превращает один экран в сотни запросов.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>Наблюдаемость со стороны БД</h2>
+      <p class="sub">Чтобы понять, что приложение делает с БД, мало смотреть в логи приложения. Postgres сам знает много полезного про себя.</p>
+
+      <article class="topic" id="sr-observability">
+        <h3>Наблюдаемость: метрики и slow log</h3>
+        <p class="summary"><code>pg_stat_database</code>, медленные запросы, ожидания блокировок.</p>
+        <div class="code-block">
+          <pre>SELECT datname, numbackends, xact_commit, xact_rollback,
+       blks_read, blks_hit,
+       round(100.0 * blks_hit / NULLIF(blks_hit + blks_read, 0), 2) AS cache_hit_pct,
+       deadlocks
+FROM   pg_stat_database
+WHERE  datname IS NOT NULL
+ORDER  BY datname;
+
+ALTER SYSTEM SET log_min_duration_statement = '500ms';
+ALTER SYSTEM SET log_lock_waits = on;
+SELECT pg_reload_conf();</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-observability">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Хороший минимум алертов: cache hit ratio &lt; 99%, рост deadlocks, лаг репликации, <code>idle in transaction</code> &gt; нескольких минут, медленные запросы из <code>pg_stat_statements</code>.</p>
+        </div>
+      </article>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

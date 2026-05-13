@@ -5,40 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Масштабирование PostgreSQL</title>
 <link rel="stylesheet" href="assets/styles.css">
-<script type="module" src="assets/app.js?v=18"></script>
+<script type="module" src="assets/app.js?v=20260513"></script>
 </head>
 <body>
 <div class="layout">
-  <aside class="sidebar">
-    <h1>PostgreSQL Tutor</h1>
-    <div class="tag">Локальный учебник</div>
-    <ul class="nav">
-      <li><a href="basics.html">Основы</a></li>
-      <li><a href="install.html">Установка</a></li>
-      <li><a href="cheatsheet.html">Шпаргалка</a></li>
-      <li><a href="types.html">Типы данных</a></li>
-      <li><a href="joins.html">Соединения</a></li>
-      <li><a href="aggregates.html">Агрегации</a></li>
-      <li><a href="window.html">Оконные функции</a></li>
-      <li><a href="transactions.html">Транзакции</a></li>
-      <li><a href="indexes.html">Индексы</a></li>
-      <li><a href="copy.html">COPY и загрузка</a></li>
-      <li><a href="scaling.html">Масштабирование</a></li>
-      <li><a href="programming.html">Программирование</a></li>
-      <li><a href="security.html">Безопасность</a></li>
-      <li><a href="tuning.html">Конфигурация и тюнинг</a></li>
-      <li><a href="decisions.html">Что выбрать</a></li>
-      <li><a href="tooling.html">Тулинг</a></li>
-      <li><a href="errors.html">Частые ошибки</a></li>
-      <li><a href="senior.html">Senior-уровень</a></li>
-      <li class="group-title">Гайды</li>
-      <li><a href="guides/list-tables.html">Список таблиц</a></li>
-      <li><a href="guides/create-table.html">Создание таблицы</a></li>
-      <li><a href="guides/vacuum.html">VACUUM</a></li>
-      <li><a href="guides/list-users.html">Список пользователей</a></li>
-      <li><a href="guides/create-index.html">Создание индекса</a></li>
-    </ul>
-  </aside>
+  <aside class="sidebar"></aside>
   <main class="main">
     <div class="topbar">
       <div class="crumbs">PostgreSQL · Масштабирование</div>
@@ -235,15 +206,74 @@ SELECT replace(
     </section>
 
     <section class="category">
-      <h2>6. Связанные темы</h2>
+      <h2>6. Декларативное партиционирование</h2>
+      <p class="sub">Когда таблица растёт до десятков и сотен миллионов строк, её разбивают на партиции по ключу — обычно по времени. Это ускоряет фильтры по диапазону и позволяет дропать старые данные одним DROP TABLE вместо VACUUM.</p>
+
+      <article class="topic" id="sr-partitioning">
+        <h3>Декларативное партиционирование</h3>
+        <p class="summary">Большие таблицы разбиваются на партиции по ключу.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE events (
+  id   bigint GENERATED ALWAYS AS IDENTITY,
+  ts   timestamptz NOT NULL,
+  data jsonb,
+  PRIMARY KEY (id, ts)
+) PARTITION BY RANGE (ts);
+
+CREATE TABLE events_2026_05 PARTITION OF events
+  FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+
+CREATE TABLE events_2026_06 PARTITION OF events
+  FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-partitioning">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Старые партиции удаляются <em>мгновенно</em> (<code>DROP TABLE</code>), без VACUUM. Это часто и есть главный мотив секционирования.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>7. Пулинг соединений</h2>
+      <p class="sub">Postgres плохо переносит тысячи активных соединений — у каждого свой процесс. Решение — внешний пул, который мультиплексирует множество клиентских коннектов через небольшой пул серверных.</p>
+
+      <article class="topic" id="sr-pgbouncer">
+        <h3>PgBouncer и пулы соединений</h3>
+        <p class="summary">Pool modes: session / transaction / statement.</p>
+        <div class="code-block">
+          <pre>; pgbouncer.ini
+[databases]
+app = host=127.0.0.1 dbname=app
+
+[pgbouncer]
+pool_mode          = transaction
+max_client_conn    = 5000
+default_pool_size  = 20
+server_reset_query = DISCARD ALL</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pgbouncer">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>В <code>transaction</code>-режиме одно серверное соединение делится между клиентами по транзакциям. Сессионные штуки (<code>LISTEN</code>, временные таблицы, prepared statements) при этом ломаются — учитывай в драйвере.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>8. Связанные темы</h2>
       <article class="topic concept">
         <h3>Где ещё про эксплуатацию</h3>
         <div class="desc">
           <ul>
-            <li><a href="senior.html#sr-replication">Репликация streaming/logical</a> — на странице Senior.</li>
-            <li><a href="senior.html#sr-partitioning">Декларативное партиционирование</a>.</li>
-            <li><a href="senior.html#sr-pgbouncer">PgBouncer и пулы соединений</a>.</li>
-            <li><a href="senior.html#sr-backup-pitr">Бэкапы и PITR</a>.</li>
+            <li><a href="replication.html">Репликация</a> — streaming, logical, sync vs async, слоты, failover.</li>
+            <li><a href="backups.html">Бэкапы и восстановление</a> — pg_dump, PITR, pgBackRest, WAL-G.</li>
+            <li><a href="migrations.html">Миграции без даунтайма</a> — expand → backfill → contract.</li>
+            <li><a href="tuning.html">Конфигурация и тюнинг</a> — <code>shared_buffers</code>, <code>work_mem</code>, autovacuum.</li>
           </ul>
         </div>
       </article>

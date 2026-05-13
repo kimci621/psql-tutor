@@ -97,7 +97,41 @@ a:hover { text-decoration: underline; }
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
+}
+.sidebar h1 a.sidebar-home {
+  color: inherit;
+  text-decoration: none;
+}
+.sidebar h1 a.sidebar-home:hover { color: var(--accent); }
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: var(--space-4);
+  text-align: left;
+}
+.sidebar-search:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+  border-color: var(--accent);
+}
+.sidebar-search .ss-label { flex: 1; }
+.sidebar-search .ss-kbd {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
 }
 
 .nav {

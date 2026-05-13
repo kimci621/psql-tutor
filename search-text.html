@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Полнотекстовый и fuzzy поиск — PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=20260513"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Полнотекстовый и fuzzy поиск</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Полнотекстовый и fuzzy поиск</h1>
+    <p class="page-lead">
+      Когда <code>LIKE '%foo%'</code> уже не справляется, у Postgres есть две встроенные опции,
+      достаточно мощные, чтобы во многих проектах заменить Elasticsearch.
+      Полнотекстовый поиск (<code>tsvector</code> + GIN-индекс) ищет по словам и
+      словоформам, <code>pg_trgm</code> — по подстрокам и похожести.
+    </p>
+
+    <section class="category">
+      <h2>Полнотекстовый поиск</h2>
+      <p class="sub">Структурированная индексация по словам и нормализации. Подходит для статей, описаний, документов.</p>
+
+      <article class="topic" id="sr-fulltext">
+        <h3>Полнотекстовый поиск</h3>
+        <p class="summary"><code>tsvector</code>, <code>tsquery</code>, GIN-индекс.</p>
+        <div class="code-block">
+          <pre>ALTER TABLE articles ADD COLUMN tsv tsvector
+  GENERATED ALWAYS AS (
+    to_tsvector('russian', coalesce(title,'') || ' ' || coalesce(body,''))
+  ) STORED;
+
+CREATE INDEX idx_articles_tsv ON articles USING gin (tsv);
+
+SELECT id, ts_rank(tsv, q) AS rank
+FROM   articles, plainto_tsquery('russian', $1) q
+WHERE  tsv @@ q
+ORDER  BY rank DESC
+LIMIT  20;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-fulltext">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>Нечёткий поиск через pg_trgm</h2>
+      <p class="sub">Когда нужно «найти похожее», искать опечатки, или просто ускорить <code>ILIKE '%…%'</code> — это сюда.</p>
+
+      <article class="topic" id="sr-pg-trgm">
+        <h3>pg_trgm — нечёткий и подстрочный поиск</h3>
+        <p class="summary">Ускоряет <code>LIKE '%foo%'</code> и даёт <code>similarity()</code>.</p>
+        <div class="code-block">
+          <pre>CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX idx_users_email_trgm
+  ON users USING gin (email gin_trgm_ops);
+
+SELECT * FROM users WHERE email ILIKE '%example%';
+
+SELECT *, similarity(name, $1) AS s
+FROM   users
+ORDER  BY s DESC
+LIMIT  10;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pg-trgm">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

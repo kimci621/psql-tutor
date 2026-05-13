@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EXPLAIN и планировщик PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=20260513"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · EXPLAIN и планировщик</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">EXPLAIN и планировщик</h1>
+    <p class="page-lead">
+      Как Postgres решает, в каком порядке читать таблицы и какие индексы использовать,
+      и как это всё прочитать самому. Это первая страница «эксплуатационного» трека:
+      без чтения планов любые попытки тюнинга превращаются в гадание.
+      Сюда же — поиск тяжёлых запросов через <code>pg_stat_statements</code> и
+      настройки, которыми планировщик обычно гнут под железо.
+    </p>
+
+    <section class="category">
+      <h2>Чтение плана запроса</h2>
+      <p class="sub">EXPLAIN — это диалог с планировщиком. Сначала учимся читать его ответы.</p>
+
+      <article class="topic" id="sr-explain-deep">
+        <h3>Чтение EXPLAIN ANALYZE</h3>
+        <p class="summary">Узлы плана: Seq Scan, Index Scan, Bitmap, Nested Loop / Hash / Merge Join.</p>
+        <div class="code-block">
+          <pre>EXPLAIN (ANALYZE, BUFFERS, VERBOSE)
+SELECT u.email, count(o.id)
+FROM   users u
+LEFT JOIN orders o ON o.user_id = u.id
+GROUP  BY u.email;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-explain-deep">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Сравнивай <code>actual rows</code> и <code>rows estimated</code>. Большая разница — устаревшая статистика или сложный предикат. <code>BUFFERS</code> покажет, сколько страниц прочитано из shared buffers и с диска.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>Поиск тяжёлых запросов</h2>
+      <p class="sub">EXPLAIN — точечный инструмент. Чтобы понять, <em>какой</em> запрос вообще оптимизировать, нужен агрегат по всему трафику.</p>
+
+      <article class="topic" id="sr-pg-stat-statements">
+        <h3>pg_stat_statements — top тяжёлых запросов</h3>
+        <p class="summary">Главный инструмент поиска того, что реально жрёт CPU и I/O.</p>
+        <div class="code-block">
+          <pre>CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+SELECT round(total_exec_time::numeric, 1) AS total_ms,
+       calls,
+       round(mean_exec_time::numeric, 2)  AS mean_ms,
+       round((100 * total_exec_time / sum(total_exec_time) OVER ())::numeric, 1) AS pct,
+       query
+FROM   pg_stat_statements
+ORDER  BY total_exec_time DESC
+LIMIT  20;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pg-stat-statements">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Ищи запросы по <code>total_exec_time</code>, а не по среднему: частый дешёвый запрос может быть дороже редкого тяжёлого.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>Гнём планировщик</h2>
+      <p class="sub">Когда план «не такой» — обычно дело не в багах планировщика, а в его представлении о железе и памяти.</p>
+
+      <article class="topic" id="sr-planner-knobs">
+        <h3>Настройки планировщика</h3>
+        <p class="summary"><code>work_mem</code>, <code>effective_cache_size</code>, <code>random_page_cost</code>.</p>
+        <div class="code-block">
+          <pre>SHOW work_mem;
+SET LOCAL work_mem = '64MB';
+
+-- На SSD имеет смысл понизить:
+ALTER SYSTEM SET random_page_cost = 1.1;
+
+-- Подсказать планировщику размер ОС-кеша:
+ALTER SYSTEM SET effective_cache_size = '12GB';
+SELECT pg_reload_conf();</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-planner-knobs">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p><code>work_mem</code> применяется к <em>каждому</em> узлу-сортировке/хэшу в каждом подключении — не выкручивай глобально, поднимай локально для тяжёлых ETL.</p>
+        </div>
+      </article>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>
