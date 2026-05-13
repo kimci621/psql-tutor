@@ -184,18 +184,349 @@ CREATE INDEX idx_posts_tags ON posts USING gin (tags);</pre>
     </section>
 
     <section class="category">
-      <h2>7. Куда ещё посмотреть</h2>
-      <p class="sub">Темы, которые живут на других страницах.</p>
+      <h2>7. Дата и время</h2>
+      <p class="sub">У Postgres есть полноценные временные типы — пользоваться <code>text</code> или <code>bigint</code> для дат стыдно. Главное правило: для прикладных меток времени почти всегда <code>timestamptz</code>, не <code>timestamp</code>.</p>
 
-      <article class="topic concept" id="types-more">
-        <h3>JSON, дата/время, UUID, диапазоны</h3>
-        <p class="summary">Эти типы достаточно объёмные, чтобы жить отдельно.</p>
+      <article class="topic" id="types-datetime">
+        <h3>date, time, timestamp, timestamptz, interval</h3>
+        <p class="summary">Пять основных типов даты и времени, и почему <code>timestamptz</code> — дефолт.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE events (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  day         date         NOT NULL,           -- только дата, без времени
+  start_at    timestamptz  NOT NULL,           -- момент времени с TZ
+  duration    interval     NOT NULL DEFAULT '0',
+  local_time  time         NOT NULL DEFAULT '00:00'  -- время без даты
+);
+
+-- арифметика:
+SELECT now() - interval '7 days';
+SELECT start_at + interval '1 hour 30 min' FROM events;
+SELECT age(timestamp '2026-05-13', '1990-01-01');
+
+-- усечение и интервалы:
+SELECT date_trunc('hour', now());
+SELECT extract(epoch FROM (end_at - start_at)) AS seconds FROM sessions;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-datetime">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
         <div class="desc">
           <ul>
-            <li><strong>JSON / JSONB</strong> — на <a href="cheatsheet.html#jsonb">главной странице</a> и в Senior-разделе.</li>
-            <li><strong>Дата и время</strong> — там же, тема <a href="cheatsheet.html#datetime">«Дата и время»</a>.</li>
-            <li><strong>UUID</strong> и его сокращения — будут в разделе «Масштабирование».</li>
-            <li><strong>range</strong>-типы (<code>int4range</code>, <code>tstzrange</code>) — для диапазонов, см. документацию PostgreSQL.</li>
+            <li><code>timestamptz</code> хранит UTC + конвертирует в TZ клиента; <code>timestamp</code> — просто наивное «настенное время», его легко сравнить с другой такой же наивной отметкой и получить смещённый результат.</li>
+            <li><code>date</code> и <code>time</code> — без часового пояса. <code>timetz</code> существует, но его обычно избегают.</li>
+            <li><code>interval</code> — особый тип; складывается с <code>timestamp</code> и сам с собой. Хорошо работает в <code>SET LOCAL statement_timeout = '2s'</code>.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>8. UUID</h2>
+      <p class="sub">Когда нужны идентификаторы, которые не угадываются по порядку и могут генерироваться на клиенте. У них своя цена — об этом ниже.</p>
+
+      <article class="topic" id="types-uuid">
+        <h3>uuid: v4 vs v7, генерация, индексы</h3>
+        <p class="summary">128-битный идентификатор, занимает 16 байт. Главный выбор — v4 (случайный) или v7 (со временем в старших битах).</p>
+        <div class="code-block">
+          <pre>CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_uuid()
+
+CREATE TABLE accounts (
+  id         uuid       PRIMARY KEY DEFAULT gen_random_uuid(),
+  email      text       NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Подача uuid из приложения:
+INSERT INTO accounts (id, email)
+VALUES ('01918b6a-7c45-7d31-9a3f-1a4b3c5d6e7f', 'a@example.com');
+
+-- Версия:
+SELECT uuid_version('01918b6a-7c45-7d31-9a3f-1a4b3c5d6e7f'::uuid);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-uuid">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>v4 (случайный)</strong> — плохой ключ для b-tree: вставки рандомные, индекс фрагментируется. Хорошо, если порядок не важен.</li>
+            <li><strong>v7 (timestamp + random)</strong> — почти как <code>bigint identity</code> по локальности; почти всегда лучше v4 как PK.</li>
+            <li>Сравни с <code>bigint identity</code>: uuid в 2 раза тяжелее, но генерится на клиенте без roundtrip к БД.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>9. JSON и JSONB</h2>
+      <p class="sub">Когда схема не фиксирована или поля «опциональны и редко». <code>jsonb</code> — почти всегда правильный выбор; <code>json</code> хранит исходный текст без парсинга.</p>
+
+      <article class="topic" id="types-jsonb">
+        <h3>jsonb: операторы и индексы</h3>
+        <p class="summary">Доступ через <code>-&gt;</code> / <code>-&gt;&gt;</code>, поиск через <code>@&gt;</code>, индекс GIN.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE docs (
+  id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  data jsonb  NOT NULL
+);
+
+-- доступ:
+SELECT data-&gt;'user'-&gt;&gt;'email' AS email FROM docs;
+
+-- поиск:
+SELECT * FROM docs WHERE data @&gt; '{"role":"admin"}';
+
+-- индекс:
+CREATE INDEX docs_data_gin ON docs USING gin (data);
+
+-- если только @&gt;, можно компактнее:
+CREATE INDEX docs_data_gin_path ON docs USING gin (data jsonb_path_ops);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-jsonb">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>-&gt;</code> возвращает <code>jsonb</code>, <code>-&gt;&gt;</code> — <code>text</code>. Путать их — типичный источник ошибок сравнения.</li>
+            <li><code>jsonb</code> — бинарный, парсит при INSERT и убирает дубли ключей; <code>json</code> — текст, дешевле на запись, дороже на чтение.</li>
+            <li>Подробности GIN-индексов и JSONPath — на странице <a href="cheatsheet.html#jsonb">шпаргалки</a>.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>10. Двоичные данные</h2>
+      <p class="sub">Если нужно положить в БД блоб байтов — не base64-строку, а именно байты, — это <code>bytea</code>. Большие файлы храните за пределами БД (S3) и держите в Postgres только метаданные.</p>
+
+      <article class="topic" id="types-bytea">
+        <h3>bytea — массив байтов</h3>
+        <p class="summary">Бинарные данные переменной длины. Формат вывода — <code>\x</code> hex по умолчанию.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE files (
+  id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  sha256  bytea  NOT NULL UNIQUE,
+  body    bytea  NOT NULL          -- небольшие блобы; крупные — в S3
+);
+
+-- литерал hex:
+INSERT INTO files (sha256, body)
+VALUES (decode('a1b2c3d4', 'hex'), decode('48656c6c6f', 'hex'));
+
+SELECT id, encode(sha256, 'hex') FROM files;
+SELECT octet_length(body) AS bytes FROM files;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-bytea">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Постгрес умеет хранить большие значения через TOAST (со сжатием), но всё равно при выборке тянет блоб целиком. Для крупных файлов — внешнее хранилище.</li>
+            <li>Существует ещё «large objects» (<code>lo</code>-API) — почти всегда не нужно, лучше <code>bytea</code>.</li>
+            <li>Когда хочется хранить хэш — <code>bytea(32)</code> для SHA-256 экономит место против hex-строки.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>11. Сетевые типы</h2>
+      <p class="sub">IP-адреса, подсети и MAC — отдельные типы со встроенной валидацией и арифметикой. Хранить адрес как <code>text</code> — лишний шанс получить «1.2.3.4 » или «1.2.3.04» с пробелом.</p>
+
+      <article class="topic" id="types-network">
+        <h3>inet, cidr, macaddr</h3>
+        <p class="summary">IP-адрес с маской, подсеть, MAC-адрес — и операторы для них.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE access_log (
+  id       bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  client   inet   NOT NULL,
+  network  cidr   NOT NULL,
+  mac      macaddr
+);
+
+INSERT INTO access_log (client, network, mac)
+VALUES ('192.168.1.42/24', '10.0.0.0/8', '08:00:2b:01:02:03');
+
+-- содержится ли адрес в подсети:
+SELECT * FROM access_log WHERE client &lt;&lt; cidr '192.168.0.0/16';
+
+-- из IPv4 в IPv6 и обратно (если совместим):
+SELECT host(client), masklen(client), family(client) FROM access_log;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-network">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>inet</code> — адрес ± маска (одна машина); <code>cidr</code> — подсеть (хост-биты обязаны быть нулями).</li>
+            <li>Операторы: <code>&lt;&lt;</code>, <code>&lt;&lt;=</code>, <code>&gt;&gt;</code>, <code>&gt;&gt;=</code> — «содержится в», «содержит».</li>
+            <li>Под индекс — GiST с <code>inet_ops</code> для запросов по диапазонам сетей.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>12. Диапазоны (range)</h2>
+      <p class="sub">Когда «от-до» — это естественная сущность: интервал бронирования, цена в диапазоне, период действия. Постгрес умеет работать с такими интервалами как с единым значением и проверять пересечения индексно.</p>
+
+      <article class="topic" id="types-ranges">
+        <h3>int4range, tstzrange, daterange, multirange</h3>
+        <p class="summary">Диапазон одного из подтипов с включением/исключением границ.</p>
+        <div class="code-block">
+          <pre>CREATE TABLE bookings (
+  id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  room_id int NOT NULL,
+  during  tstzrange NOT NULL,
+  EXCLUDE USING gist (room_id WITH =, during WITH &amp;&amp;)   -- запрет наложений
+);
+
+INSERT INTO bookings (room_id, during)
+VALUES (1, tstzrange('2026-05-13 10:00+03', '2026-05-13 12:00+03', '[)'));
+
+-- операции:
+SELECT lower(during), upper(during) FROM bookings;
+SELECT * FROM bookings WHERE during @&gt; timestamptz '2026-05-13 11:00+03';
+SELECT * FROM bookings WHERE during &amp;&amp; tstzrange(now(), now() + interval '1h');
+
+-- multirange — набор диапазонов как одно значение (PG 14+):
+SELECT '{[1,4), [7,10)}'::int4multirange;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-ranges">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Скобки <code>[</code> и <code>]</code> включают границу, <code>(</code> и <code>)</code> — исключают. Каноничный «дискретный» диапазон в Postgres всегда <code>[..)</code> — закрытый слева, открытый справа.</li>
+            <li>Самый сильный сценарий — <code>EXCLUDE USING gist (... WITH &amp;&amp;)</code>: БД сама не даст вставить пересекающийся интервал.</li>
+            <li>Под индекс пересечений (<code>&amp;&amp;</code>, <code>@&gt;</code>) — GiST.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>13. Геометрические типы</h2>
+      <p class="sub">Встроенные point/line/polygon — нишевые. Для серьёзной геометрии все пишут на PostGIS, но базовые геометрические типы полезны для простых сценариев и обучения.</p>
+
+      <article class="topic" id="types-geometric">
+        <h3>point, line, polygon и PostGIS</h3>
+        <p class="summary">Базовая геометрия из коробки и расширение PostGIS для всего серьёзного.</p>
+        <div class="code-block">
+          <pre>-- встроенные:
+SELECT point(1, 2);
+SELECT point(0,0) &lt;-&gt; point(3, 4) AS distance;        -- 5
+SELECT polygon '((0,0),(0,4),(4,4),(4,0))' @&gt; point(1,1);  -- true
+
+-- PostGIS — индустриальный стандарт:
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+CREATE TABLE places (
+  id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name text NOT NULL,
+  geom geography(Point, 4326) NOT NULL
+);
+
+CREATE INDEX places_geom_gix ON places USING gist (geom);
+
+SELECT name
+FROM   places
+WHERE  ST_DWithin(geom, ST_MakePoint(37.6, 55.7)::geography, 1000);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-geometric">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Встроенные геометрические типы оперируют декартовой плоскостью без учёта сферы Земли — для геоданных бери PostGIS.</li>
+            <li>В PostGIS два мира: <code>geometry</code> (плоскость, быстро) и <code>geography</code> (сфера, корректные расстояния).</li>
+            <li>Индекс под пространственные запросы — GiST или SP-GiST.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>14. Композитные и доменные типы</h2>
+      <p class="sub">Когда хочется свой тип с именованными полями или собственное «суженное» представление существующего. Используется редко, но даёт чистый код там, где сильно нужно.</p>
+
+      <article class="topic" id="types-composite">
+        <h3>Композитные типы (row types)</h3>
+        <p class="summary">Свой тип с именованными полями. По сути — типизированная строка.</p>
+        <div class="code-block">
+          <pre>CREATE TYPE address AS (
+  city   text,
+  street text,
+  zip    text
+);
+
+CREATE TABLE customers (
+  id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name text    NOT NULL,
+  addr address NOT NULL
+);
+
+INSERT INTO customers (name, addr)
+VALUES ('Анна', ROW('Москва','Тверская 1','125009'));
+
+SELECT name, (addr).city FROM customers;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-composite">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>В большинстве случаев <em>отдельные колонки</em> в основной таблице удобнее, чем композит — поля видны через <code>\d</code>, индексируются как обычно, понятны в EXPLAIN.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="types-domain">
+        <h3>Доменные типы</h3>
+        <p class="summary">Тип с собственным <code>CHECK</code> и значением по умолчанию. «Брендированный» алиас существующего типа.</p>
+        <div class="code-block">
+          <pre>CREATE DOMAIN email AS text
+  CHECK (VALUE ~* '^[^@]+@[^@]+\.[^@]+$');
+
+CREATE TABLE users (
+  id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email email  NOT NULL UNIQUE
+);
+
+INSERT INTO users (email) VALUES ('bad');   -- ERROR: violates check
+INSERT INTO users (email) VALUES ('a@b.co');</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="types-domain">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <p>Домен — отличный способ запретить мусор на уровне БД, не таская копию <code>CHECK</code> в каждую таблицу. Минус — менять правило сложнее, чем подправить <code>CHECK</code> на одной колонке.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>15. Куда ещё посмотреть</h2>
+      <p class="sub">Что осталось за рамками — узкоспециальные типы и темы, у которых есть свои страницы.</p>
+
+      <article class="topic concept" id="types-more">
+        <h3>Полнотекстовый поиск, деньги, XML и редкие типы</h3>
+        <p class="summary">Ссылки на смежные страницы и краткий обзор того, что нечасто пригождается.</p>
+        <div class="desc">
+          <ul>
+            <li><a href="search-text.html"><strong>tsvector / tsquery</strong></a> — типы под полнотекстовый поиск.</li>
+            <li><a href="decisions.html#dec-money-types"><strong>Какой тип для денег</strong></a> — <code>numeric</code> vs копейки в <code>bigint</code> vs <code>money</code> (последний почти всегда не нужен).</li>
+            <li><strong>XML</strong> — официально есть, реально почти не используется. Если выбор между XML и JSONB — это JSONB.</li>
+            <li><strong>Bit strings</strong> (<code>bit</code>, <code>bit varying</code>) — фиксированной длины битовая последовательность. Узкая ниша, обычно достаточно <code>integer</code> с битовой арифметикой.</li>
+            <li><strong>Pseudo-types</strong> (<code>anyelement</code>, <code>regtype</code>, <code>void</code>) — используются в сигнатурах функций PL/pgSQL, не в обычных таблицах.</li>
+            <li><a href="cheatsheet.html#types-cast"><strong>Приведение типов</strong></a> (<code>::type</code>, <code>CAST</code>) — на шпаргалке.</li>
           </ul>
         </div>
       </article>

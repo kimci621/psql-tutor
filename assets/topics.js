@@ -1760,6 +1760,183 @@ export const topics = {
     ],
     relatedTopics: ["jsonb", "gin-index"]
   },
+  "types-datetime": {
+    title: "Дата и время",
+    summary: "date, time, timestamp, timestamptz, interval — и почему timestamptz почти всегда дефолт.",
+    examples: [
+      "CREATE TABLE events (\n  start_at timestamptz NOT NULL,\n  duration interval NOT NULL DEFAULT '0'\n);",
+      "SELECT now() - interval '7 days';",
+      "SELECT date_trunc('hour', now());",
+      "SELECT extract(epoch FROM (end_at - start_at)) AS seconds FROM sessions;"
+    ],
+    pitfalls: [
+      "timestamp (без TZ) сравнивается «как написано» — легко получить смещение между серверами",
+      "timestamptz хранит UTC и конвертирует в TZ клиента — для прикладных меток это и нужно",
+      "interval нельзя индексировать как ключ; обычно нужен как смещение в выражении"
+    ],
+    learningGoals: [
+      "выбирать между date / timestamp / timestamptz",
+      "работать с interval и арифметикой времени"
+    ],
+    relatedTopics: ["datetime", "types-ranges"]
+  },
+  "types-uuid": {
+    title: "UUID",
+    summary: "128-битный идентификатор; ключевой выбор — v4 (рандом) или v7 (со временем).",
+    examples: [
+      "CREATE EXTENSION IF NOT EXISTS pgcrypto;",
+      "CREATE TABLE accounts (\n  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n  email text NOT NULL UNIQUE\n);",
+      "SELECT uuid_version('01918b6a-7c45-7d31-9a3f-1a4b3c5d6e7f'::uuid);"
+    ],
+    pitfalls: [
+      "uuid v4 как PK фрагментирует b-tree и медленнее bigint identity",
+      "uuid v7 (timestamp+random) почти всегда лучше v4 для ключей",
+      "uuid занимает 16 байт против 8 у bigint — индексы крупнее"
+    ],
+    learningGoals: [
+      "выбирать между uuid v4, v7 и bigint identity",
+      "видеть цену uuid в индексах"
+    ],
+    relatedTopics: ["uuid", "dec-id-type", "sequences"]
+  },
+  "types-jsonb": {
+    title: "JSON и JSONB",
+    summary: "Полуструктурированные данные. jsonb — бинарный с парсингом, json — текст as-is.",
+    examples: [
+      "CREATE TABLE docs (\n  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  data jsonb NOT NULL\n);",
+      "SELECT data->'user'->>'email' FROM docs;",
+      "SELECT * FROM docs WHERE data @> '{\"role\":\"admin\"}';",
+      "CREATE INDEX docs_data_gin ON docs USING gin (data jsonb_path_ops);"
+    ],
+    pitfalls: [
+      "-> возвращает jsonb, ->> — text; путать опасно при сравнениях",
+      "jsonb дороже на запись (парсинг), json — на чтение",
+      "JSONB удобен, но не повод не нормализовывать давно сложившиеся поля"
+    ],
+    learningGoals: [
+      "выбирать между json и jsonb",
+      "индексировать jsonb через GIN"
+    ],
+    relatedTopics: ["jsonb", "jsonb-ops-vs-pathops", "gin-index"]
+  },
+  "types-bytea": {
+    title: "bytea — двоичные данные",
+    summary: "Массив байтов переменной длины. Для блобов «не очень больших»; крупные файлы держи во внешнем хранилище.",
+    examples: [
+      "CREATE TABLE files (\n  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  sha256 bytea NOT NULL UNIQUE,\n  body bytea NOT NULL\n);",
+      "INSERT INTO files (sha256, body) VALUES (decode('a1b2','hex'), decode('48656c6c6f','hex'));",
+      "SELECT encode(sha256, 'hex') FROM files;",
+      "SELECT octet_length(body) FROM files;"
+    ],
+    pitfalls: [
+      "bytea-вывод по умолчанию hex (\\x...) — не путать с hex-литералом в SQL",
+      "TOAST сожмёт большие значения, но при выборке тянет блоб целиком",
+      "Для больших файлов — S3 / объектное хранилище, в БД только метаданные"
+    ],
+    learningGoals: [
+      "хранить хеши и небольшие блобы без base64",
+      "понимать ограничения хранения файлов в БД"
+    ],
+    relatedTopics: ["types-strings", "copy-formats"]
+  },
+  "types-network": {
+    title: "Сетевые типы: inet, cidr, macaddr",
+    summary: "IP-адрес ± маска, подсеть и MAC — со встроенной валидацией и операторами включения.",
+    examples: [
+      "CREATE TABLE access_log (\n  client inet NOT NULL,\n  network cidr NOT NULL,\n  mac macaddr\n);",
+      "SELECT * FROM access_log WHERE client << cidr '192.168.0.0/16';",
+      "SELECT host(client), masklen(client), family(client) FROM access_log;"
+    ],
+    pitfalls: [
+      "cidr требует, чтобы хост-биты были нулями — иначе ошибка",
+      "Хранить IP как text — путь к мусорным значениям",
+      "Под индекс диапазонов сетей — GiST с inet_ops"
+    ],
+    learningGoals: [
+      "выбирать inet vs cidr",
+      "пользоваться операторами << / >> для подсетей"
+    ],
+    relatedTopics: ["types-strings"]
+  },
+  "types-ranges": {
+    title: "Диапазоны: int4range, tstzrange, multirange",
+    summary: "Интервал «от-до» как одно значение, с включением/исключением границ и GiST-индексом.",
+    examples: [
+      "CREATE TABLE bookings (\n  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  room_id int NOT NULL,\n  during tstzrange NOT NULL,\n  EXCLUDE USING gist (room_id WITH =, during WITH &&)\n);",
+      "INSERT INTO bookings (room_id, during) VALUES (1, tstzrange('2026-05-13 10:00+03','2026-05-13 12:00+03','[)'));",
+      "SELECT * FROM bookings WHERE during && tstzrange(now(), now() + interval '1h');",
+      "SELECT '{[1,4),[7,10)}'::int4multirange;"
+    ],
+    pitfalls: [
+      "Каноничный дискретный диапазон в Postgres — [..) (закрытый слева, открытый справа)",
+      "Без gist-индекса операторы && и @> работают медленно",
+      "EXCLUDE USING gist — то, ради чего range-типы вообще нужны"
+    ],
+    learningGoals: [
+      "запрещать наложения интервалов через EXCLUDE USING gist",
+      "работать с операторами && и @> на range"
+    ],
+    relatedTopics: ["types-datetime", "gin-index"]
+  },
+  "types-geometric": {
+    title: "Геометрические типы и PostGIS",
+    summary: "Встроенные point/line/polygon хороши для простых сценариев; для геоданных — PostGIS.",
+    examples: [
+      "SELECT point(0,0) <-> point(3,4) AS distance;",
+      "SELECT polygon '((0,0),(0,4),(4,4),(4,0))' @> point(1,1);",
+      "CREATE EXTENSION IF NOT EXISTS postgis;",
+      "SELECT name FROM places WHERE ST_DWithin(geom, ST_MakePoint(37.6,55.7)::geography, 1000);"
+    ],
+    pitfalls: [
+      "Встроенная геометрия — плоскость, без учёта сферы; для геолокации это PostGIS",
+      "В PostGIS две модели: geometry (быстрее) и geography (корректные расстояния на сфере)",
+      "Под пространственные запросы — GiST или SP-GiST индекс"
+    ],
+    learningGoals: [
+      "понимать, когда нужен PostGIS",
+      "выбирать geometry vs geography"
+    ],
+    relatedTopics: ["gin-index"]
+  },
+  "types-composite": {
+    title: "Композитные (row) типы",
+    summary: "Свой тип с именованными полями. По сути — типизированная строка.",
+    examples: [
+      "CREATE TYPE address AS (city text, street text, zip text);",
+      "CREATE TABLE customers (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, name text NOT NULL, addr address NOT NULL);",
+      "INSERT INTO customers (name, addr) VALUES ('Анна', ROW('Москва','Тверская 1','125009'));",
+      "SELECT name, (addr).city FROM customers;"
+    ],
+    pitfalls: [
+      "Поля композита не видны через \\d таблицы — теряем «обзорность»",
+      "Сложнее индексировать (через выражение), чем обычные колонки",
+      "В большинстве случаев плоские колонки удобнее"
+    ],
+    learningGoals: [
+      "видеть, когда композит оправдан, а когда нет",
+      "обращаться к полям композита через (col).field"
+    ],
+    relatedTopics: ["create-table-basic"]
+  },
+  "types-domain": {
+    title: "Доменные типы",
+    summary: "Тип-алиас с собственным CHECK и значением по умолчанию.",
+    examples: [
+      "CREATE DOMAIN email AS text CHECK (VALUE ~* '^[^@]+@[^@]+\\.[^@]+$');",
+      "CREATE TABLE users (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, email email NOT NULL UNIQUE);",
+      "ALTER DOMAIN email DROP CONSTRAINT email_check;"
+    ],
+    pitfalls: [
+      "Менять CHECK у домена с уже наполненной таблицей — операция дороже, чем менять CHECK на колонке",
+      "Домены не наследуют операторы базового типа автоматически — иногда нужен явный cast",
+      "Удобно для «общего справочника» (email, phone), но не делай домены для всего подряд"
+    ],
+    learningGoals: [
+      "запрещать мусорные значения на уровне типа",
+      "понимать, чем домен лучше CHECK на каждой колонке"
+    ],
+    relatedTopics: ["constraints", "types-composite"]
+  },
 
   // ===== Итерация 2: Соединения и агрегации =====
 
