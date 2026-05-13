@@ -377,7 +377,8 @@ export const topics = {
     learningGoals: [
       "понимать порядок WHERE → GROUP BY → HAVING",
       "пользоваться FILTER вместо CASE WHEN"
-    ]
+    ],
+    relatedTopics: ["having", "grouping-sets", "win-intro"]
   },
 
   // 11. CTE
@@ -449,7 +450,8 @@ export const topics = {
     learningGoals: [
       "проектировать составные индексы",
       "понимать, когда индекс не помогает"
-    ]
+    ],
+    relatedTopics: ["gin-index", "index-types", "composite-index"]
   },
   "partial-index": {
     title: "Частичный индекс",
@@ -464,7 +466,8 @@ export const topics = {
     learningGoals: [
       "сужать индекс под частые запросы",
       "снижать стоимость поддержки индекса"
-    ]
+    ],
+    relatedTopics: ["expression-index", "selectivity"]
   },
   "gin-index": {
     title: "GIN-индексы для jsonb и массивов",
@@ -480,7 +483,8 @@ export const topics = {
     learningGoals: [
       "выбирать тип индекса под структуру данных",
       "понимать стоимость GIN на запись"
-    ]
+    ],
+    relatedTopics: ["sr-fulltext", "sr-pg-trgm", "jsonb"]
   },
 
   // 14. Транзакции
@@ -499,7 +503,8 @@ export const topics = {
     learningGoals: [
       "выбирать уровень изоляции под задачу",
       "обрабатывать retry-логику"
-    ]
+    ],
+    relatedTopics: ["acid", "iso-summary", "savepoints"]
   },
   "locks": {
     title: "Блокировки строк",
@@ -515,7 +520,8 @@ export const topics = {
     learningGoals: [
       "реализовать простую очередь",
       "избегать deadlocks"
-    ]
+    ],
+    relatedTopics: ["sr-advisory-locks", "sr-mvcc-snapshot"]
   },
 
   // 15. Представления
@@ -659,7 +665,8 @@ export const topics = {
     learningGoals: [
       "читать узлы плана",
       "находить ключевые узкие места"
-    ]
+    ],
+    relatedTopics: ["sr-explain-deep", "explain-before-after"]
   },
 
   // 19. JSON / JSONB
@@ -679,7 +686,8 @@ export const topics = {
     learningGoals: [
       "уверенно ходить по jsonb",
       "выбирать тип GIN-индекса"
-    ]
+    ],
+    relatedTopics: ["jsonb-ops-vs-pathops", "jsonb-expression-index", "gin-index"]
   },
 
   // 20. Дата и время
@@ -1006,7 +1014,8 @@ export const topics = {
     learningGoals: [
       "уверенно читать узлы плана",
       "связывать узкое место с настройкой/индексом"
-    ]
+    ],
+    relatedTopics: ["sr-pg-stat-statements", "sr-planner-knobs", "explain"]
   },
   "sr-pg-stat-statements": {
     title: "pg_stat_statements",
@@ -1023,7 +1032,8 @@ export const topics = {
     learningGoals: [
       "находить top-N запросов по суммарному времени",
       "отличать редкий-тяжёлый запрос от частого-лёгкого"
-    ]
+    ],
+    relatedTopics: ["sr-explain-deep", "sr-observability"]
   },
   "sr-planner-knobs": {
     title: "Настройки планировщика",
@@ -1041,7 +1051,8 @@ export const topics = {
     learningGoals: [
       "подбирать work_mem под рабочую нагрузку",
       "понимать, что меняет random_page_cost"
-    ]
+    ],
+    relatedTopics: ["sr-explain-deep", "cfg-shared-buffers", "cfg-work-mem"]
   },
 
   "sr-mvcc-snapshot": {
@@ -1059,7 +1070,8 @@ export const topics = {
     learningGoals: [
       "понимать, как Postgres решает «видна ли строка»",
       "связывать долгие транзакции и bloat"
-    ]
+    ],
+    relatedTopics: ["iso-summary", "vacuum-basic"]
   },
   "sr-advisory-locks": {
     title: "Advisory locks",
@@ -1076,7 +1088,8 @@ export const topics = {
     learningGoals: [
       "обеспечить «один воркер на задачу»",
       "не переусложнять там, где хватает уникального индекса"
-    ]
+    ],
+    relatedTopics: ["locks", "sr-outbox"]
   },
   "sr-listen-notify": {
     title: "LISTEN / NOTIFY",
@@ -1094,7 +1107,8 @@ export const topics = {
     learningGoals: [
       "выбирать NOTIFY vs очередь",
       "понимать ограничения доставки"
-    ]
+    ],
+    relatedTopics: ["sr-outbox"]
   },
   "sr-outbox": {
     title: "Транзакционный outbox",
@@ -1110,7 +1124,8 @@ export const topics = {
     learningGoals: [
       "решать «atomic publish» без распределённых транзакций",
       "проектировать идемпотентного потребителя"
-    ]
+    ],
+    relatedTopics: ["sr-listen-notify", "sr-advisory-locks"]
   },
 
   "sr-zero-downtime-migrations": {
@@ -1127,7 +1142,8 @@ export const topics = {
     learningGoals: [
       "выкатывать миграции без окон обслуживания",
       "не превращать ALTER в инцидент"
-    ]
+    ],
+    relatedTopics: ["alter-table", "sr-pgbouncer"]
   },
   "sr-partitioning": {
     title: "Декларативное партиционирование",
@@ -1143,7 +1159,8 @@ export const topics = {
     learningGoals: [
       "решать, нужна ли таблице секционность",
       "проектировать ключ секционирования под запросы"
-    ]
+    ],
+    relatedTopics: ["create-index-btree", "sr-replication"]
   },
   "sr-replication": {
     title: "Репликация: streaming и logical",
@@ -1159,7 +1176,8 @@ export const topics = {
     learningGoals: [
       "выбирать тип репликации под задачу",
       "видеть лаг и его причины"
-    ]
+    ],
+    relatedTopics: ["sr-physical-vs-logical", "sr-sync-async", "sr-replication-slots", "sr-failover"]
   },
   "sr-pgbouncer": {
     title: "PgBouncer и пулы соединений",
@@ -1175,7 +1193,8 @@ export const topics = {
     learningGoals: [
       "выбирать pool_mode осознанно",
       "проектировать ёмкость по подключениям"
-    ]
+    ],
+    relatedTopics: ["cfg-max-connections", "sr-app-orm"]
   },
   "sr-backup-pitr": {
     title: "Бэкапы и PITR",
@@ -1193,7 +1212,8 @@ export const topics = {
     learningGoals: [
       "выбирать стратегию резервирования",
       "понимать RTO/RPO"
-    ]
+    ],
+    relatedTopics: ["sr-pgdump-formats", "sr-pgrestore-parallel", "sr-pgbackrest-walg", "sr-recovery-checklist"]
   },
 
   "sr-rls": {
@@ -1210,7 +1230,8 @@ export const topics = {
     learningGoals: [
       "реализовать multi-tenant изоляцию на уровне БД",
       "тестировать политики обеими ролями"
-    ]
+    ],
+    relatedTopics: ["sr-security-definer", "sec-grant-patterns"]
   },
   "sr-security-definer": {
     title: "Безопасные функции SECURITY DEFINER",
@@ -1226,7 +1247,8 @@ export const topics = {
     learningGoals: [
       "писать безопасные привилегированные функции",
       "понимать риск search_path-инъекций"
-    ]
+    ],
+    relatedTopics: ["sr-rls", "sec-grant-revoke", "raise-using"]
   },
   "sr-prepared-statements": {
     title: "Prepared statements и SQL-инъекции",
@@ -1243,7 +1265,8 @@ export const topics = {
     learningGoals: [
       "понимать стоимость generic vs custom plan",
       "избегать инъекций на уровне кода"
-    ]
+    ],
+    relatedTopics: ["dynamic-sql", "sr-rls"]
   },
 
   "sr-fulltext": {
@@ -1260,7 +1283,8 @@ export const topics = {
     learningGoals: [
       "решить, хватает ли FTS Postgres",
       "строить индексы под запросы"
-    ]
+    ],
+    relatedTopics: ["sr-pg-trgm", "gin-index"]
   },
   "sr-pg-trgm": {
     title: "pg_trgm — нечёткий и подстрочный поиск",
@@ -1275,7 +1299,8 @@ export const topics = {
     learningGoals: [
       "ускорять LIKE/ILIKE",
       "выбирать GIN vs GiST для trgm"
-    ]
+    ],
+    relatedTopics: ["sr-fulltext", "gin-index"]
   },
 
   "sr-app-orm": {
@@ -1292,7 +1317,8 @@ export const topics = {
     learningGoals: [
       "распознавать N+1",
       "проектировать слой данных под смешанный подход"
-    ]
+    ],
+    relatedTopics: ["sr-observability", "sr-pgbouncer", "json-agg-vs-orm"]
   },
   "sr-observability": {
     title: "Наблюдаемость PostgreSQL",
@@ -1310,7 +1336,8 @@ export const topics = {
     learningGoals: [
       "видеть здоровье БД одним взглядом",
       "ставить осмысленные алерты"
-    ]
+    ],
+    relatedTopics: ["sr-pg-stat-statements", "sr-app-orm"]
   },
 
   "err-role-exists": {
@@ -1345,7 +1372,8 @@ export const topics = {
     learningGoals: [
       "перечислять задачи, которые решает СУБД",
       "понимать разницу между файлом, key-value и реляционной БД"
-    ]
+    ],
+    relatedTopics: ["dbms-cluster-db", "about-postgres", "relational-vs-nosql"]
   },
   "dbms-cluster-db": {
     title: "СУБД, база данных, кластер",
@@ -1402,7 +1430,8 @@ export const topics = {
     learningGoals: [
       "по виду запроса понимать его категорию",
       "ориентироваться в правах по категориям"
-    ]
+    ],
+    relatedTopics: ["sql-declarative", "sql-comments"]
   },
   "keys-pk-fk": {
     title: "Первичный и внешний ключи",
@@ -1418,7 +1447,8 @@ export const topics = {
     learningGoals: [
       "проектировать ключи под бизнес-смысл",
       "знать, как FK взаимодействует с DELETE/UPDATE"
-    ]
+    ],
+    relatedTopics: ["rel-one-to-many", "rel-many-to-many", "create-table-basic"]
   },
   "select-sources": {
     title: "Откуда ещё можно SELECT",
@@ -1538,7 +1568,8 @@ export const topics = {
     learningGoals: [
       "понимать, как работают serial и identity внутри",
       "управлять последовательностями руками"
-    ]
+    ],
+    relatedTopics: ["dec-id-type", "uuid"]
   },
   "aliases": {
     title: "Псевдонимы (aliases)",
@@ -1568,7 +1599,8 @@ export const topics = {
     learningGoals: [
       "представлять физическую раскладку данных",
       "понимать, что такое страница и зачем"
-    ]
+    ],
+    relatedTopics: ["dbms-cluster-db", "vacuum-basic"]
   },
 
   // --- install.html ---
@@ -1693,7 +1725,8 @@ export const topics = {
     learningGoals: [
       "выбирать ENUM vs справочная таблица",
       "понимать стоимость изменений ENUM"
-    ]
+    ],
+    relatedTopics: ["constraints"]
   },
   "types-boolean": {
     title: "Тип boolean",
@@ -1724,7 +1757,8 @@ export const topics = {
     learningGoals: [
       "выбирать массив vs отдельная таблица",
       "пользоваться ANY/ALL/@>"
-    ]
+    ],
+    relatedTopics: ["jsonb", "gin-index"]
   },
 
   // ===== Итерация 2: Соединения и агрегации =====
@@ -1756,7 +1790,8 @@ export const topics = {
     learningGoals: [
       "сохранять «осиротевшие» строки",
       "не превращать LEFT в INNER случайно"
-    ]
+    ],
+    relatedTopics: ["inner-join", "full-outer-join", "semi-join"]
   },
   "full-outer-join": {
     title: "FULL OUTER JOIN",
@@ -1768,7 +1803,11 @@ export const topics = {
       "Часто избыточен — обычно нужен LEFT с другой стороны",
       "Удобен для сверки двух версий данных"
     ],
-    learningGoals: ["находить расхождения между таблицами"]
+    learningGoals: [
+      "находить расхождения между двумя таблицами",
+      "понимать, когда FULL OUTER избыточен (обычно нужен LEFT с другой стороны)"
+    ],
+    relatedTopics: ["left-right-join", "inner-join"]
   },
   "cross-join": {
     title: "CROSS JOIN",
@@ -1781,7 +1820,10 @@ export const topics = {
       "На больших таблицах легко получить миллиарды строк",
       "Без CROSS JOIN тот же эффект даёт запятая в FROM (устаревший стиль)"
     ],
-    learningGoals: ["понимать, когда декартово произведение оправдано"]
+    learningGoals: [
+      "понимать, когда декартово произведение оправдано (календарь × категории)",
+      "избегать случайного CROSS JOIN от запятой в FROM"
+    ]
   },
   "self-join": {
     title: "SELF JOIN",
@@ -1793,7 +1835,11 @@ export const topics = {
       "Без разных алиасов запрос не парсится",
       "Для глубокой иерархии лучше WITH RECURSIVE"
     ],
-    learningGoals: ["работать с самоссылающимися связями"]
+    learningGoals: [
+      "работать с самоссылающимися связями через алиасы",
+      "выбирать SELF JOIN или WITH RECURSIVE по глубине иерархии"
+    ],
+    relatedTopics: ["recursive-cte", "multi-table-join"]
   },
   "natural-join": {
     title: "NATURAL JOIN",
@@ -1820,7 +1866,8 @@ export const topics = {
       "В отличие от JOIN, не дублирует строки при нескольких совпадениях",
       "IN с NULL внутри списка — частая ловушка"
     ],
-    learningGoals: ["выбирать EXISTS vs JOIN vs IN", "избегать дублей"]
+    learningGoals: ["выбирать EXISTS vs JOIN vs IN", "избегать дублей"],
+    relatedTopics: ["anti-join", "left-right-join"]
   },
   "anti-join": {
     title: "ANTI JOIN (NOT EXISTS, LEFT JOIN ... IS NULL)",
@@ -1833,7 +1880,8 @@ export const topics = {
       "NOT IN c подзапросом, возвращающим NULL → ничего не вернётся",
       "NOT EXISTS корректно работает с NULL и обычно эффективнее"
     ],
-    learningGoals: ["находить «осиротевших»", "не наступать на NOT IN с NULL"]
+    learningGoals: ["находить «осиротевших»", "не наступать на NOT IN с NULL"],
+    relatedTopics: ["semi-join", "left-right-join"]
   },
   "multi-table-join": {
     title: "Соединение более двух таблиц",
@@ -1845,7 +1893,11 @@ export const topics = {
       "С тремя+ JOIN важнее всего читаемость — выравнивай условия",
       "Планировщик сам выбирает порядок соединений; join_collapse_limit ограничивает поиск"
     ],
-    learningGoals: ["писать читаемые многотабличные запросы"]
+    learningGoals: [
+      "писать читаемые многотабличные запросы (порядок и форматирование)",
+      "разбивать длинную цепочку через CTE, если она не помещается в голову"
+    ],
+    relatedTopics: ["inner-join", "left-right-join", "cte"]
   },
   "rel-one-to-many": {
     title: "Связь 1:N (один ко многим)",
@@ -1857,7 +1909,11 @@ export const topics = {
       "Индекс на FK-столбце нужен почти всегда",
       "ON DELETE CASCADE удобен, но опасен — продумывай до проектирования"
     ],
-    learningGoals: ["проектировать FK правильно"]
+    learningGoals: [
+      "проектировать FK на стороне «многих»",
+      "понимать, как 1:N выглядит в запросах JOIN"
+    ],
+    relatedTopics: ["keys-pk-fk", "left-right-join"]
   },
   "rel-many-to-many": {
     title: "Связь N:M (многие ко многим)",
@@ -1869,7 +1925,11 @@ export const topics = {
       "PRIMARY KEY (a, b) уже строит индекс по первому столбцу — на второй индекс нужен отдельно",
       "На промежуточной таблице иногда полезны дополнительные атрибуты (created_at, weight)"
     ],
-    learningGoals: ["проектировать junction-таблицу"]
+    learningGoals: [
+      "проектировать junction-таблицу с составным PK",
+      "избегать прямого FK между двумя «многими»"
+    ],
+    relatedTopics: ["keys-pk-fk", "multi-table-join"]
   },
   "rel-one-to-one": {
     title: "Связь 1:1 (один к одному)",
@@ -1881,7 +1941,11 @@ export const topics = {
       "Если профиль есть всегда — его столбцы можно держать прямо в users",
       "1:1 оправдан, когда «дочерняя» часть редкая или сильно отличается по жизненному циклу"
     ],
-    learningGoals: ["видеть, когда 1:1 действительно нужен"]
+    learningGoals: [
+      "видеть, когда 1:1 действительно нужен, а когда это «толстая» строка",
+      "реализовать 1:1 через UNIQUE FK или общий PK"
+    ],
+    relatedTopics: ["keys-pk-fk", "unique-index"]
   },
 
   // --- aggregates.html ---
@@ -1908,7 +1972,8 @@ export const topics = {
       "Без FILTER (WHERE o.id IS NOT NULL) при LEFT JOIN получишь массив с одним null",
       "Огромные json_agg на серверной стороне могут есть память — следи за размером результата"
     ],
-    learningGoals: ["лечить N+1 одним SQL", "выбирать json_agg vs jsonb_agg"]
+    learningGoals: ["лечить N+1 одним SQL", "выбирать json_agg vs jsonb_agg"],
+    relatedTopics: ["sr-app-orm", "group-by"]
   },
   "case-when": {
     title: "CASE WHEN",
@@ -1921,7 +1986,11 @@ export const topics = {
       "Без ELSE возвращается NULL для непокрытых случаев",
       "FILTER (WHERE ...) обычно читабельнее CASE для условных агрегатов"
     ],
-    learningGoals: ["писать читаемые ветвления в SELECT"]
+    learningGoals: [
+      "писать читаемые ветвления внутри SELECT",
+      "комбинировать CASE с агрегатами для сводных колонок"
+    ],
+    relatedTopics: ["group-by", "having"]
   },
   "having": {
     title: "HAVING — фильтр после агрегации",
@@ -1933,7 +2002,11 @@ export const topics = {
       "В HAVING можно использовать агрегаты, в WHERE — нельзя",
       "Часто соблазн всё писать в HAVING — не стоит, WHERE дешевле"
     ],
-    learningGoals: ["разделять фильтры до и после"]
+    learningGoals: [
+      "разделять WHERE (до агрегации) и HAVING (после)",
+      "не использовать HAVING там, где хватает WHERE"
+    ],
+    relatedTopics: ["group-by", "win-intro"]
   },
   "distinct": {
     title: "DISTINCT и DISTINCT ON",
@@ -1946,7 +2019,8 @@ export const topics = {
       "DISTINCT ON требует ORDER BY, начинающегося с тех же столбцов",
       "Часто DISTINCT прячет ошибку в JOIN-условии"
     ],
-    learningGoals: ["выбирать DISTINCT vs GROUP BY", "знать DISTINCT ON"]
+    learningGoals: ["выбирать DISTINCT vs GROUP BY", "знать DISTINCT ON"],
+    relatedTopics: ["group-by", "win-dedupe"]
   },
   "grouping-sets": {
     title: "GROUPING SETS, ROLLUP, CUBE",
@@ -1958,7 +2032,11 @@ export const topics = {
       "Строка-итог отличается NULL в столбце — используй grouping() для надёжного распознавания",
       "Эквивалент UNION ALL по нескольким GROUP BY — но компактнее и быстрее"
     ],
-    learningGoals: ["считать итоги и подытоги одним запросом"]
+    learningGoals: [
+      "считать итоги и подытоги одним запросом",
+      "отличать GROUPING SETS от UNION ALL по производительности"
+    ],
+    relatedTopics: ["group-by", "win-intro"]
   },
   "subqueries": {
     title: "Подзапросы",
@@ -1971,7 +2049,8 @@ export const topics = {
       "Коррелированные подзапросы выполняются для каждой внешней строки — иногда дороже JOIN-а",
       "CTE нередко читабельнее, чем вложенные подзапросы"
     ],
-    learningGoals: ["видеть три вида подзапросов", "выбирать между подзапросом, JOIN и CTE"]
+    learningGoals: ["видеть три вида подзапросов", "выбирать между подзапросом, JOIN и CTE"],
+    relatedTopics: ["cte", "lateral-join"]
   },
   "set-ops": {
     title: "UNION, EXCEPT, INTERSECT",
@@ -1984,7 +2063,8 @@ export const topics = {
       "Количество и типы столбцов должны совпадать",
       "ORDER BY ставится в конце финального запроса"
     ],
-    learningGoals: ["использовать UNION ALL по умолчанию", "знать EXCEPT/INTERSECT"]
+    learningGoals: ["использовать UNION ALL по умолчанию", "знать EXCEPT/INTERSECT"],
+    relatedTopics: ["subqueries", "cte"]
   },
 
   // ===== Итерация 3: Транзакции и индексы =====
@@ -2017,7 +2097,8 @@ export const topics = {
     learningGoals: [
       "переводить каждую букву в практический смысл",
       "не путать C с CAP-Consistency"
-    ]
+    ],
+    relatedTopics: ["transactions", "iso-summary"]
   },
   "savepoints": {
     title: "Savepoints — точки сохранения",
@@ -2033,7 +2114,8 @@ export const topics = {
     learningGoals: [
       "делать частичный откат",
       "не злоупотреблять — десятки тысяч savepoint в одной транзакции тормозят"
-    ]
+    ],
+    relatedTopics: ["transactions", "acid"]
   },
   "iso-read-uncommitted-committed": {
     title: "READ UNCOMMITTED / READ COMMITTED",
@@ -2095,7 +2177,8 @@ export const topics = {
     learningGoals: [
       "выбирать уровень осознанно",
       "знать, какие аномалии где возможны"
-    ]
+    ],
+    relatedTopics: ["iso-read-uncommitted-committed", "iso-repeatable-read", "iso-serializable", "dec-isolation"]
   },
 
   // --- indexes.html ---
@@ -2110,7 +2193,8 @@ export const topics = {
       "Чаще всего: сначала равенство, потом диапазон",
       "DESC vs ASC влияет на ORDER BY — индекс должен совпадать с сортировкой запроса"
     ],
-    learningGoals: ["проектировать индекс под конкретный запрос", "видеть use в EXPLAIN"]
+    learningGoals: ["проектировать индекс под конкретный запрос", "видеть use в EXPLAIN"],
+    relatedTopics: ["inner-join", "covering-index", "selectivity"]
   },
   "unique-index": {
     title: "Индекс на уникальность",
@@ -2126,7 +2210,8 @@ export const topics = {
     learningGoals: [
       "выбирать UNIQUE constraint vs UNIQUE INDEX",
       "пользоваться частичным UNIQUE"
-    ]
+    ],
+    relatedTopics: ["constraints", "composite-index"]
   },
   "selectivity": {
     title: "Селективность",
@@ -2140,7 +2225,8 @@ export const topics = {
       "Помогает частичный индекс или включение редкого столбца в составной",
       "Планировщик опирается на pg_stats — старая статистика = плохой план"
     ],
-    learningGoals: ["понимать связь селективности и плана", "не удивляться Seq Scan"]
+    learningGoals: ["понимать связь селективности и плана", "не удивляться Seq Scan"],
+    relatedTopics: ["stats-extended", "composite-index"]
   },
   "expression-index": {
     title: "Индекс по выражению",
@@ -2153,7 +2239,8 @@ export const topics = {
       "Функция должна быть IMMUTABLE",
       "Generated column + индекс — современная альтернатива"
     ],
-    learningGoals: ["ускорять регистронезависимый поиск", "поддерживать одинаковые выражения"]
+    learningGoals: ["ускорять регистронезависимый поиск", "поддерживать одинаковые выражения"],
+    relatedTopics: ["partial-index", "jsonb-expression-index"]
   },
   "covering-index": {
     title: "Покрывающие индексы (INCLUDE)",
@@ -2166,7 +2253,8 @@ export const topics = {
       "Index-Only Scan работает, только если visibility map говорит, что страница «всё-видима»",
       "Слишком большие INCLUDE раздувают индекс — теряется смысл"
     ],
-    learningGoals: ["добиваться Index-Only Scan", "выбирать INCLUDE-столбцы"]
+    learningGoals: ["добиваться Index-Only Scan", "выбирать INCLUDE-столбцы"],
+    relatedTopics: ["composite-index", "create-index-btree"]
   },
   "index-types": {
     title: "Типы индексов: B-tree, GIN, GiST, SP-GiST, BRIN, Hash",
@@ -2179,7 +2267,8 @@ export const topics = {
       "BRIN полезен, когда строки физически упорядочены по индексируемому столбцу",
       "GIN с jsonb_path_ops компактнее, но поддерживает только @>"
     ],
-    learningGoals: ["выбирать тип под структуру данных", "знать про BRIN для time-series"]
+    learningGoals: ["выбирать тип под структуру данных", "знать про BRIN для time-series"],
+    relatedTopics: ["create-index-btree", "gin-index"]
   },
   "stats-extended": {
     title: "Расширенная статистика",
@@ -2191,7 +2280,11 @@ export const topics = {
       "Без extended stats планировщик считает столбцы независимыми и сильно ошибается в оценках",
       "Виды: ndistinct, dependencies, mcv (с PG 12)"
     ],
-    learningGoals: ["лечить мисс-эстимейт на коррелирующих столбцах"]
+    learningGoals: [
+      "лечить мисс-эстимейт на коррелирующих столбцах",
+      "знать, когда обычной ANALYZE-статистики не хватает"
+    ],
+    relatedTopics: ["analyze", "selectivity"]
   },
   "shopping-list-problem": {
     title: "Проблема списка покупок (N+1)",
@@ -2219,7 +2312,10 @@ export const topics = {
       "Вертикалка проще, но имеет физический потолок и стоит нелинейно дорого",
       "Перед масштабированием — оптимизация запросов и индексов"
     ],
-    learningGoals: ["видеть, какой путь оправдан в твоём сценарии"]
+    learningGoals: [
+      "видеть, какой путь оправдан в твоём сценарии",
+      "понимать, что вертикальный почти всегда дешевле горизонтального"
+    ]
   },
   "sharding": {
     title: "Шардирование",
@@ -2232,7 +2328,8 @@ export const topics = {
       "Решардинг — операция уровня недели/месяца, не бери шардирование без необходимости",
       "Citus снимает много рутины, но это уже другой эксплуатационный режим"
     ],
-    learningGoals: ["выбирать ключ шардирования", "понимать стоимость cross-shard запросов"]
+    learningGoals: ["выбирать ключ шардирования", "понимать стоимость cross-shard запросов"],
+    relatedTopics: ["sr-partitioning", "dec-partition-shard"]
   },
   "cap-theorem": {
     title: "CAP / PACELC",
@@ -2243,7 +2340,10 @@ export const topics = {
       "C из CAP — не C из ACID. Это linearizability, не «целостность ограничений»",
       "PACELC: даже без сбоев есть выбор Latency vs Consistency"
     ],
-    learningGoals: ["переводить теорему в инженерные решения"]
+    learningGoals: [
+      "переводить теорему в инженерные решения",
+      "не путать CAP с гарантиями ACID одиночной БД"
+    ]
   },
   "pk-choice": {
     title: "Что использовать в качестве PRIMARY KEY",
@@ -2281,7 +2381,10 @@ export const topics = {
       "Помни про padding: base64 от 16 байт даёт 24 символа; обрезка двух '=' даёт 22",
       "Base58 (без 0/O/I/l) удобнее для пользователей, но требует кода на стороне приложения"
     ],
-    learningGoals: ["сокращать uuid для пользовательских URL"]
+    learningGoals: [
+      "сокращать uuid для пользовательских URL",
+      "помнить, что в БД храним полный UUID, а не сокращение"
+    ]
   },
   "oltp-olap": {
     title: "OLTP и OLAP",
@@ -2292,7 +2395,10 @@ export const topics = {
       "Часто ставят реплику Postgres под аналитические запросы, чтобы не мешать продовому OLTP",
       "TimescaleDB — расширение Postgres для time-series, лежит между OLTP и OLAP"
     ],
-    learningGoals: ["видеть, какой профиль нагрузки у твоего сервиса"]
+    learningGoals: [
+      "видеть, какой профиль нагрузки у твоего сервиса",
+      "понимать, зачем под OLAP выносят отдельную реплику или хранилище"
+    ]
   },
 
   // --- programming.html ---
@@ -2307,7 +2413,8 @@ export const topics = {
       "BEGIN/END в PL/pgSQL — это блок кода, а не транзакция",
       "RAISE NOTICE — для логов; RAISE EXCEPTION — прерывает с откатом"
     ],
-    learningGoals: ["писать простые серверные процедуры", "не злоупотреблять PL/pgSQL"]
+    learningGoals: ["писать простые серверные процедуры", "не злоупотреблять PL/pgSQL"],
+    relatedTopics: ["functions-procedures", "triggers"]
   },
   "functions-procedures": {
     title: "Функции и процедуры",
@@ -2320,7 +2427,8 @@ export const topics = {
       "В PROCEDURE можно делать COMMIT/ROLLBACK; в FUNCTION — нельзя",
       "Безопасные SECURITY DEFINER-функции требуют SET search_path"
     ],
-    learningGoals: ["выбирать FUNCTION vs PROCEDURE", "знать, чем процедура отличается"]
+    learningGoals: ["выбирать FUNCTION vs PROCEDURE", "знать, чем процедура отличается"],
+    relatedTopics: ["plpgsql", "returns-table-setof"]
   },
   "triggers": {
     title: "Триггеры и правила",
@@ -2333,7 +2441,8 @@ export const topics = {
       "STATEMENT-триггеры срабатывают раз на запрос; ROW — на каждую строку",
       "Триггеры — «магия»: тяжело отлаживать через год; в современных проектах часто заменяют логикой в приложении или generated columns"
     ],
-    learningGoals: ["писать BEFORE UPDATE для updated_at", "знать про STATEMENT vs ROW"]
+    learningGoals: ["писать BEFORE UPDATE для updated_at", "знать про STATEMENT vs ROW"],
+    relatedTopics: ["plpgsql", "sr-outbox"]
   },
 
   // --- tooling.html ---
@@ -2348,7 +2457,11 @@ export const topics = {
       "pgcli приятен в интерактиве, но в скриптах ничего не даёт",
       "GUI хороши для просмотра, но крупные миграции лучше через psql + файлы"
     ],
-    learningGoals: ["иметь под рукой 1–2 удобных клиента"]
+    learningGoals: [
+      "иметь под рукой 1–2 удобных клиента (CLI и/или GUI)",
+      "знать, в чём pgcli удобнее psql и где DBeaver выигрывает"
+    ],
+    relatedTopics: ["psql-tricks", "pgpass"]
   },
   "psql-tricks": {
     title: "Хитрости psql и pgcli",
@@ -2361,7 +2474,8 @@ export const topics = {
       "\\gexec — мощный, но опасный: один лишний пробел, и ты выполнил не то",
       "\\watch не поддерживает SET — там обычная команда зацикленно повторяется"
     ],
-    learningGoals: ["сократить рутину в psql", "знать про \\copy"]
+    learningGoals: ["сократить рутину в psql", "знать про \\copy"],
+    relatedTopics: ["tools-overview", "pgpass"]
   },
   "pgpass": {
     title: ".pgpass — файл с паролями",
@@ -2374,7 +2488,8 @@ export const topics = {
       "* допустим в любом поле как wildcard",
       "Альтернатива — переменные PGPASSWORD/PGUSER/PGDATABASE, но они видны в `ps -ef`"
     ],
-    learningGoals: ["избавиться от ввода пароля каждый раз", "не светить пароли в process list"]
+    learningGoals: ["избавиться от ввода пароля каждый раз", "не светить пароли в process list"],
+    relatedTopics: ["psql-connect", "psql-tricks"]
   },
   "db-sizes": {
     title: "Размер БД, таблиц и индексов",
@@ -2387,7 +2502,10 @@ export const topics = {
       "Раздутый индекс — кандидат на REINDEX CONCURRENTLY",
       "Размер БД не уменьшится после DELETE — нужен VACUUM (не FULL — он переписывает таблицу)"
     ],
-    learningGoals: ["находить «толстые» таблицы и индексы"]
+    learningGoals: [
+      "находить «толстые» таблицы и индексы",
+      "отличать pg_relation_size от pg_total_relation_size"
+    ]
   },
   "sqlite-comparison": {
     title: "SQLite vs PostgreSQL",
@@ -2411,7 +2529,8 @@ export const topics = {
       "Rows Removed by Filter — признак, что индекс не задействован",
       "Buffers shared hit/read важнее «времени»: время плавает между прогонами"
     ],
-    learningGoals: ["читать актуальные строки плана", "видеть эффект индекса"]
+    learningGoals: ["читать актуальные строки плана", "видеть эффект индекса"],
+    relatedTopics: ["explain", "composite-index"]
   },
 
   // ===== decisions.html =====
@@ -2420,35 +2539,55 @@ export const topics = {
     summary: "Дерево решений для подбора индекса под запрос.",
     examples: [],
     pitfalls: ["Композитный индекс работает по leftmost prefix", "GIN/jsonb_path_ops — только для @>"],
-    learningGoals: ["сопоставлять запрос и тип индекса"]
+    learningGoals: [
+      "сопоставлять запрос и тип индекса (b-tree / GIN / BRIN / hash)",
+      "видеть, когда индекс не нужен совсем"
+    ],
+    relatedTopics: ["composite-index", "gin-index", "selectivity"]
   },
   "dec-isolation": {
     title: "Какой уровень изоляции выбрать",
     summary: "READ COMMITTED / REPEATABLE READ / SERIALIZABLE.",
     examples: [],
     pitfalls: ["SERIALIZABLE может бросать 40001 — приложение должно ретраить", "Lost update лечится FOR UPDATE, а не более высоким уровнем"],
-    learningGoals: ["выбирать минимально достаточный уровень"]
+    learningGoals: [
+      "выбирать минимально достаточный уровень изоляции",
+      "знать симптомы phantom read и lost update"
+    ],
+    relatedTopics: ["iso-summary", "iso-serializable"]
   },
   "dec-id-type": {
     title: "Какой тип ID для PK",
     summary: "bigint identity vs UUID v4 vs UUID v7.",
     examples: [],
     pitfalls: ["UUID v4 рассыпает индекс случайно — медленнее вставки", "money тип в Postgres — антипаттерн"],
-    learningGoals: ["выбирать ID под видимость и распределённость"]
+    learningGoals: [
+      "выбирать ID под предсказуемость, видимость и распределённость",
+      "понимать, почему UUID v4 плох для b-tree-индекса"
+    ],
+    relatedTopics: ["sequences", "uuid", "pk-choice"]
   },
   "dec-partition-shard": {
     title: "Партиционирование vs шардинг",
     summary: "Когда хватит partition, а когда нужен шардинг.",
     examples: [],
     pitfalls: ["Шардинг — дорого; индексы и партиции часто решают", "PARTITION BY RANGE/LIST помогает с DROP старых данных"],
-    learningGoals: ["оценивать масштабы перед шардингом"]
+    learningGoals: [
+      "оценивать масштабы прежде, чем тянуться к шардингу",
+      "видеть, что партиционирование решает локальные проблемы, а шардинг — нет"
+    ],
+    relatedTopics: ["sr-partitioning", "sharding"]
   },
   "dec-money-types": {
     title: "Какой тип для денег",
     summary: "numeric vs bigint в копейках vs money vs float.",
     examples: ["numeric(12, 2) NOT NULL CHECK (price >= 0)"],
     pitfalls: ["float — approximate, нельзя для финансовых расчётов", "money зависит от lc_monetary"],
-    learningGoals: ["хранить деньги без сюрпризов"]
+    learningGoals: [
+      "хранить деньги без сюрпризов округления",
+      "выбирать между numeric и копейками в bigint осознанно"
+    ],
+    relatedTopics: ["types-numbers"]
   },
 
   // ===== copy.html =====
@@ -2464,7 +2603,11 @@ export const topics = {
       "BINARY быстрее, но нечитаем и привязан к версии/архитектуре",
       "FORMAT csv требует HEADER, если файл с заголовками"
     ],
-    learningGoals: ["выбирать формат под задачу"]
+    learningGoals: [
+      "выбирать формат COPY под задачу (TEXT / CSV / BINARY)",
+      "понимать, чем BINARY быстрее и в чём минусы"
+    ],
+    relatedTopics: ["copy-stdin", "copy-tuning"]
   },
   "copy-stdin": {
     title: "\\copy и COPY FROM STDIN",
@@ -2477,7 +2620,11 @@ export const topics = {
       "COPY 'path' читает файл на сервере, нужны права",
       "\\copy — это команда psql, не SQL"
     ],
-    learningGoals: ["загружать локальные файлы без серверных прав"]
+    learningGoals: [
+      "загружать локальные файлы без серверных прав",
+      "знать различие \\copy (клиент) и COPY (сервер)"
+    ],
+    relatedTopics: ["copy-formats", "copy-vs-pgdump"]
   },
   "copy-tuning": {
     title: "Тюнинг массовой загрузки",
@@ -2490,7 +2637,8 @@ export const topics = {
       "FK и индексы во время COPY дорого; ребилди после",
       "Без ANALYZE планировщик слепой"
     ],
-    learningGoals: ["ускорять разовые загрузки", "возвращать ограничения после"]
+    learningGoals: ["ускорять разовые загрузки", "возвращать ограничения после"],
+    relatedTopics: ["copy-formats", "sr-pgrestore-parallel"]
   },
   "copy-from-program": {
     title: "COPY FROM PROGRAM",
@@ -2502,7 +2650,11 @@ export const topics = {
       "Команда выполняется на сервере от имени postgres — мощная и опасная функция",
       "С PG 11 — роль pg_execute_server_program вместо полного SUPERUSER"
     ],
-    learningGoals: ["применять с осторожностью"]
+    learningGoals: [
+      "применять COPY FROM PROGRAM с пониманием угроз",
+      "избегать его в untrusted-контекстах"
+    ],
+    relatedTopics: ["copy-formats"]
   },
   "copy-vs-pgdump": {
     title: "COPY vs pg_dump",
@@ -2512,7 +2664,11 @@ export const topics = {
       "pg_dump — структура + данные одной БД; COPY — только данные",
       "pg_restore -j параллелит данные и индексы; COPY однопоточный"
     ],
-    learningGoals: ["выбирать инструмент под сценарий переноса"]
+    learningGoals: [
+      "выбирать инструмент под сценарий переноса",
+      "понимать, что COPY — про таблицы, pg_dump — про схему и данные целиком"
+    ],
+    relatedTopics: ["sr-pgdump-formats", "copy-stdin"]
   },
 
   // ===== JSONB углубление =====
@@ -2527,7 +2683,11 @@ export const topics = {
       "jsonb_path_ops поддерживает только @>",
       "jsonb_ops крупнее, но универсальнее"
     ],
-    learningGoals: ["выбирать operator class под нагрузку"]
+    learningGoals: [
+      "выбирать operator class под нагрузку",
+      "учитывать стоимость поддержки индекса при изменениях"
+    ],
+    relatedTopics: ["jsonb", "gin-index"]
   },
   "jsonb-jsonpath": {
     title: "JSONPath: jsonb_path_query и @@",
@@ -2540,7 +2700,8 @@ export const topics = {
       "@@ — boolean-предикат; @? — существование пути",
       "JSONPath ≠ JSON Pointer; синтаксис свой"
     ],
-    learningGoals: ["писать выборки JSONPath", "видеть разницу между @@ и @?"]
+    learningGoals: ["писать выборки JSONPath", "видеть разницу между @@ и @?"],
+    relatedTopics: ["jsonb", "jsonb-ops-vs-pathops"]
   },
   "jsonb-expression-index": {
     title: "Индекс по выражению из jsonb",
@@ -2552,7 +2713,8 @@ export const topics = {
     pitfalls: [
       "Тип ->>'...' — text; для чисел нужен явный cast и тот же cast в запросе"
     ],
-    learningGoals: ["когда B-tree дешевле GIN", "писать соответствующий WHERE"]
+    learningGoals: ["когда B-tree дешевле GIN", "писать соответствующий WHERE"],
+    relatedTopics: ["jsonb", "expression-index"]
   },
 
   // ===== window.html =====
@@ -2566,7 +2728,11 @@ export const topics = {
       "Без OVER агрегат схлопывает строки",
       "PARTITION BY делит на группы, ORDER BY — задаёт порядок внутри"
     ],
-    learningGoals: ["отличать обычные агрегаты от оконных"]
+    learningGoals: [
+      "отличать обычные агрегаты от оконных",
+      "понимать роль OVER и пустого OVER()"
+    ],
+    relatedTopics: ["win-ranking", "win-running-total", "group-by"]
   },
   "win-frames": {
     title: "Кадры окна: ROWS / RANGE / GROUPS",
@@ -2581,7 +2747,8 @@ export const topics = {
       "RANGE объединяет строки с одинаковым ключом ORDER BY",
       "GROUPS появился в PG 11"
     ],
-    learningGoals: ["задавать кадр точно", "выбирать тип под задачу"]
+    learningGoals: ["задавать кадр точно", "выбирать тип под задачу"],
+    relatedTopics: ["win-intro", "win-running-total"]
   },
   "win-lag-lead": {
     title: "LAG / LEAD",
@@ -2594,7 +2761,8 @@ export const topics = {
       "lag без offset — это lag(col, 1)",
       "lag(col, 1, default) — третий аргумент защищает от NULL"
     ],
-    learningGoals: ["считать дельты", "находить gaps между событиями"]
+    learningGoals: ["считать дельты", "находить gaps между событиями"],
+    relatedTopics: ["win-running-total", "win-intro"]
   },
   "win-first-last-value": {
     title: "FIRST_VALUE / LAST_VALUE / NTH_VALUE",
@@ -2605,7 +2773,11 @@ export const topics = {
     pitfalls: [
       "LAST_VALUE с дефолтным RANGE возвращает текущую строку, а не последнюю — нужен явный frame UNBOUNDED ... UNBOUNDED"
     ],
-    learningGoals: ["задавать симметричный frame для last_value"]
+    learningGoals: [
+      "задавать симметричный frame для корректного LAST_VALUE",
+      "знать, что NTH_VALUE — это не RANK"
+    ],
+    relatedTopics: ["win-intro", "win-frames"]
   },
   "win-ranking": {
     title: "ROW_NUMBER / RANK / DENSE_RANK",
@@ -2616,7 +2788,11 @@ export const topics = {
     pitfalls: [
       "row_number — всегда уникален; rank — пропуски после ничьих; dense_rank — без пропусков"
     ],
-    learningGoals: ["выбирать правильный тип нумерации"]
+    learningGoals: [
+      "выбирать ROW_NUMBER vs RANK vs DENSE_RANK по требованиям",
+      "знать поведение всех трёх при равных значениях"
+    ],
+    relatedTopics: ["win-intro", "win-top-n"]
   },
   "win-running-total": {
     title: "Running totals",
@@ -2625,7 +2801,11 @@ export const topics = {
       "sum(total) OVER (PARTITION BY user_id ORDER BY created_at ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)"
     ],
     pitfalls: ["Без явного frame можно получить «весь partition» вместо нарастающего итога"],
-    learningGoals: ["писать классический running total"]
+    learningGoals: [
+      "писать классический running total через SUM() OVER",
+      "помнить про порядок ORDER BY в окне"
+    ],
+    relatedTopics: ["win-intro", "win-frames"]
   },
   "win-top-n": {
     title: "Top-N per group",
@@ -2635,7 +2815,11 @@ export const topics = {
       "SELECT u.email, t.* FROM users u JOIN LATERAL (SELECT id FROM orders o WHERE o.user_id = u.id ORDER BY total DESC LIMIT 3) t ON true;"
     ],
     pitfalls: ["LATERAL часто эффективнее window-функции на огромных таблицах"],
-    learningGoals: ["писать top-N через row_number и через LATERAL"]
+    learningGoals: [
+      "писать top-N через row_number и через LATERAL JOIN",
+      "выбирать между ними по плану EXPLAIN"
+    ],
+    relatedTopics: ["win-ranking", "win-dedupe", "lateral-join"]
   },
   "win-dedupe": {
     title: "Dedupe — оставить одну строку из дубликатов",
@@ -2644,7 +2828,11 @@ export const topics = {
       "WITH ranked AS (SELECT id, row_number() OVER (PARTITION BY lower(email) ORDER BY created_at DESC) rn FROM users)\nDELETE FROM users u USING ranked r WHERE u.id = r.id AND r.rn > 1;"
     ],
     pitfalls: ["Перед DELETE — обязательно SELECT-проверка с тем же CTE"],
-    learningGoals: ["безопасно чистить дубли"]
+    learningGoals: [
+      "безопасно чистить дубли через ROW_NUMBER",
+      "проверять выборку перед DELETE на проде"
+    ],
+    relatedTopics: ["win-top-n", "win-ranking"]
   },
   "win-named": {
     title: "Именованные окна (WINDOW)",
@@ -2653,7 +2841,11 @@ export const topics = {
       "SELECT sum(total) OVER w, row_number() OVER w FROM orders WINDOW w AS (PARTITION BY user_id ORDER BY created_at);"
     ],
     pitfalls: ["Без именованного окна одинаковая спецификация в нескольких местах — копипаста"],
-    learningGoals: ["использовать WINDOW для DRY"]
+    learningGoals: [
+      "использовать WINDOW для DRY, когда несколько функций над тем же кадром",
+      "повышать читаемость запроса"
+    ],
+    relatedTopics: ["win-intro", "win-frames"]
   },
 
   // ===== Расширенная репликация =====
@@ -2668,7 +2860,8 @@ export const topics = {
       "Физическая требует совпадения мажорной версии и архитектуры",
       "Логическая поверх физической — для неё нужен wal_level = logical и slot"
     ],
-    learningGoals: ["выбирать тип под задачу", "понимать ограничения каждой"]
+    learningGoals: ["выбирать тип под задачу", "понимать ограничения каждой"],
+    relatedTopics: ["sr-replication", "sr-sync-async"]
   },
   "sr-sync-async": {
     title: "Синхронная vs асинхронная репликация",
@@ -2682,7 +2875,8 @@ export const topics = {
       "Sync без живой реплики — primary встаёт",
       "remote_apply дороже всего, но даёт read-after-write на реплике"
     ],
-    learningGoals: ["понимать уровни synchronous_commit", "разделять чувствительные и нет транзакции"]
+    learningGoals: ["понимать уровни synchronous_commit", "разделять чувствительные и нет транзакции"],
+    relatedTopics: ["sr-replication", "sr-replication-slots"]
   },
   "sr-replication-slots": {
     title: "Replication slots, wal_keep_size",
@@ -2696,7 +2890,8 @@ export const topics = {
       "max_slot_wal_keep_size — обязательная защита",
       "wal_keep_size заменил wal_keep_segments с PG 13"
     ],
-    learningGoals: ["управлять слотами", "следить за объёмом WAL"]
+    learningGoals: ["управлять слотами", "следить за объёмом WAL"],
+    relatedTopics: ["sr-replication", "sr-failover"]
   },
   "sr-failover": {
     title: "Failover и оркестрация",
@@ -2709,7 +2904,8 @@ export const topics = {
       "pg_rewind дешевле, чем basebackup, для возврата старого primary",
       "Switchover — управляемый, failover — аварийный"
     ],
-    learningGoals: ["понимать роль оркестратора", "выбирать решение под инфраструктуру"]
+    learningGoals: ["понимать роль оркестратора", "выбирать решение под инфраструктуру"],
+    relatedTopics: ["sr-replication", "sr-pgbouncer"]
   },
 
   // ===== Расширенные бэкапы =====
@@ -2726,7 +2922,8 @@ export const topics = {
       "pg_dumpall — единственный, кто экспортирует роли и табл-пространства",
       "Custom уже сжат, ещё раз gzip-ом не нужно"
     ],
-    learningGoals: ["выбирать формат под задачу", "разделять кластерные и БД-объекты"]
+    learningGoals: ["выбирать формат под задачу", "разделять кластерные и БД-объекты"],
+    relatedTopics: ["sr-pgrestore-parallel", "sr-backup-pitr"]
   },
   "sr-pgrestore-parallel": {
     title: "pg_restore -j: параллельное восстановление",
@@ -2740,7 +2937,8 @@ export const topics = {
       "Перед массовым restore — поднять max_wal_size, maintenance_work_mem",
       "После restore нужен ANALYZE — иначе планировщик слепой"
     ],
-    learningGoals: ["распараллеливать восстановление", "разбивать на секции pre/data/post"]
+    learningGoals: ["распараллеливать восстановление", "разбивать на секции pre/data/post"],
+    relatedTopics: ["sr-pgdump-formats", "copy-vs-pgdump"]
   },
   "sr-pgbackrest-walg": {
     title: "pgBackRest и WAL-G",
@@ -2754,7 +2952,8 @@ export const topics = {
       "Шифрование repo — обязательно для облака",
       "Бэкап без проверки restore — это не бэкап"
     ],
-    learningGoals: ["настроить промышленный бэкап с PITR", "понимать full/diff/incremental"]
+    learningGoals: ["настроить промышленный бэкап с PITR", "понимать full/diff/incremental"],
+    relatedTopics: ["sr-backup-pitr", "sr-backup-retention"]
   },
   "sr-backup-retention": {
     title: "Retention и тестирование бэкапов",
@@ -2768,7 +2967,8 @@ export const topics = {
       "DR-учения раз в квартал, иначе план «восстановления» — фикция",
       "Контрольные суммы страниц нужны, чтобы битый сектор не уехал в бэкапы"
     ],
-    learningGoals: ["задавать политику хранения", "отрабатывать DR-сценарий"]
+    learningGoals: ["задавать политику хранения", "отрабатывать DR-сценарий"],
+    relatedTopics: ["sr-backup-pitr", "sr-recovery-checklist"]
   },
   "sr-recovery-checklist": {
     title: "Чек-лист восстановления",
@@ -2779,7 +2979,8 @@ export const topics = {
       "Перед любыми правками — снимок «места преступления» (логи, $PGDATA)",
       "Старый кластер выключить, но не удалять — пригодится для разбора"
     ],
-    learningGoals: ["восстанавливать без импровизации", "разделять рестор и переключение трафика"]
+    learningGoals: ["восстанавливать без импровизации", "разделять рестор и переключение трафика"],
+    relatedTopics: ["sr-backup-pitr", "sr-pgbackrest-walg"]
   },
 
   // ===== tuning.html =====
@@ -2795,7 +2996,8 @@ export const topics = {
       "Больше 32 ГБ обычно не растёт эффект",
       "Слишком большой = двойное буферирование с кешем ОС"
     ],
-    learningGoals: ["видеть hit-ratio", "понимать связь с кешем ОС"]
+    learningGoals: ["видеть hit-ratio", "понимать связь с кешем ОС"],
+    relatedTopics: ["cfg-effective-cache-size", "cfg-work-mem"]
   },
   "cfg-work-mem": {
     title: "work_mem",
@@ -2809,7 +3011,8 @@ export const topics = {
       "Реальный пик: max_connections × запросы × work_mem × кол-во операций",
       "Поднимай локально (SET LOCAL), а не глобально"
     ],
-    learningGoals: ["читать Sort Method в EXPLAIN", "ставить work_mem на сессию"]
+    learningGoals: ["читать Sort Method в EXPLAIN", "ставить work_mem на сессию"],
+    relatedTopics: ["cfg-maintenance-work-mem", "sr-planner-knobs"]
   },
   "cfg-effective-cache-size": {
     title: "effective_cache_size",
@@ -2822,7 +3025,8 @@ export const topics = {
       "Слишком мало → лишние seq-scan",
       "Меняется на лету (SIGHUP)"
     ],
-    learningGoals: ["задавать 50–75% RAM", "понимать влияние на выбор плана"]
+    learningGoals: ["задавать 50–75% RAM", "понимать влияние на выбор плана"],
+    relatedTopics: ["cfg-shared-buffers", "sr-planner-knobs"]
   },
   "cfg-maintenance-work-mem": {
     title: "maintenance_work_mem",
@@ -2834,7 +3038,11 @@ export const topics = {
       "autovacuum использует autovacuum_work_mem (по умолчанию = maintenance_work_mem)",
       "Поднимать перед миграциями и ребилдами"
     ],
-    learningGoals: ["ускорять разовые операции"]
+    learningGoals: [
+      "ускорять разовые операции (CREATE INDEX, VACUUM)",
+      "поднимать локально через SET для сессии-мигратора"
+    ],
+    relatedTopics: ["cfg-work-mem", "vacuum-basic"]
   },
   "cfg-checkpoint": {
     title: "checkpoint_timeout, max_wal_size, completion_target",
@@ -2848,7 +3056,8 @@ export const topics = {
       "Слишком большой timeout = долгий recovery",
       "full_page_writes должен быть on на проде"
     ],
-    learningGoals: ["читать pg_stat_bgwriter", "балансировать IO и recovery time"]
+    learningGoals: ["читать pg_stat_bgwriter", "балансировать IO и recovery time"],
+    relatedTopics: ["cfg-wal-level", "cfg-shared-buffers"]
   },
   "cfg-wal-level": {
     title: "wal_level",
@@ -2861,7 +3070,11 @@ export const topics = {
       "logical больше по объёму; включай только если нужен CDC/logical replication",
       "minimal не даст ни PITR, ни реплик"
     ],
-    learningGoals: ["выбирать уровень под задачу"]
+    learningGoals: [
+      "выбирать уровень под задачу (replica для streaming, logical для CDC)",
+      "не оставлять logical, если он не нужен — это лишняя нагрузка"
+    ],
+    relatedTopics: ["sr-replication", "sr-physical-vs-logical"]
   },
   "cfg-autovacuum": {
     title: "autovacuum: пороги срабатывания",
@@ -2875,7 +3088,8 @@ export const topics = {
       "Никогда не выключай autovacuum — только перенастраивай",
       "cost_delay тормозит autovacuum; на горячих таблицах нужно его уменьшать"
     ],
-    learningGoals: ["per-table тюнинг", "видеть n_dead_tup"]
+    learningGoals: ["per-table тюнинг", "видеть n_dead_tup"],
+    relatedTopics: ["vacuum-basic", "analyze"]
   },
   "cfg-max-connections": {
     title: "max_connections",
@@ -2889,7 +3103,11 @@ export const topics = {
       "Сотни idle = нет пула на стороне приложения",
       "Поднимать без необходимости — терять память на shared structures"
     ],
-    learningGoals: ["видеть нагрузку через pg_stat_activity"]
+    learningGoals: [
+      "видеть текущую нагрузку через pg_stat_activity",
+      "знать, что после ~200 коннекций имеет смысл PgBouncer"
+    ],
+    relatedTopics: ["sr-pgbouncer", "sr-observability"]
   },
   "cfg-pgbouncer": {
     title: "PgBouncer: режимы пулинга",
@@ -2903,7 +3121,8 @@ export const topics = {
       "prepared statements клиента в transaction-режиме без поддержки protocol-level — не работают",
       "statement-режим запрещает мульти-stmt транзакции"
     ],
-    learningGoals: ["выбирать режим под драйвер", "читать SHOW POOLS"]
+    learningGoals: ["выбирать режим под драйвер", "читать SHOW POOLS"],
+    relatedTopics: ["sr-pgbouncer", "cfg-max-connections"]
   },
   "cfg-planner-io": {
     title: "random_page_cost, effective_io_concurrency",
@@ -2916,7 +3135,8 @@ export const topics = {
       "effective_io_concurrency для NVMe — 100–300",
       "jit = on иногда замедляет короткие OLTP"
     ],
-    learningGoals: ["настроить cost под SSD", "понимать влияние на выбор плана"]
+    learningGoals: ["настроить cost под SSD", "понимать влияние на выбор плана"],
+    relatedTopics: ["sr-planner-knobs", "sr-explain-deep"]
   },
 
   // ===== security.html =====
@@ -2933,7 +3153,8 @@ export const topics = {
       "trust на проде — это дыра; используй scram-sha-256",
       "После правки нужен SELECT pg_reload_conf(); перезапуск не требуется"
     ],
-    learningGoals: ["читать pg_hba.conf", "понимать local/host/hostssl/hostnossl"]
+    learningGoals: ["читать pg_hba.conf", "понимать local/host/hostssl/hostnossl"],
+    relatedTopics: ["sec-auth-methods", "sec-tls"]
   },
   "sec-auth-methods": {
     title: "Методы аутентификации",
@@ -2946,7 +3167,11 @@ export const topics = {
       "peer работает только для local-сокетов",
       "cert требует клиентский сертификат; имя CN мапится на роль"
     ],
-    learningGoals: ["выбирать метод аутентификации под сценарий"]
+    learningGoals: [
+      "выбирать метод аутентификации под сценарий",
+      "переводить наследие с md5 на scram-sha-256"
+    ],
+    relatedTopics: ["sec-pg-hba", "sec-roles"]
   },
   "sec-tls": {
     title: "TLS / SSL для подключений",
@@ -2960,7 +3185,11 @@ export const topics = {
       "self-signed сертификат без verify-full — ложное чувство безопасности",
       "hostnossl ... reject — гарантия, что в обход TLS не зайдёт никто"
     ],
-    learningGoals: ["настроить TLS на сервере и клиенте"]
+    learningGoals: [
+      "настроить TLS на сервере и клиенте",
+      "понимать разницу sslmode=require и verify-full"
+    ],
+    relatedTopics: ["sec-pg-hba", "sec-auth-methods"]
   },
   "sec-roles": {
     title: "Роли, группы, SET ROLE",
@@ -2974,7 +3203,8 @@ export const topics = {
       "INHERIT — права групп активны автоматически, иначе нужно SET ROLE",
       "SUPERUSER обходит RLS и все проверки прав"
     ],
-    learningGoals: ["строить иерархию ролей", "не выдавать SUPERUSER приложениям"]
+    learningGoals: ["строить иерархию ролей", "не выдавать SUPERUSER приложениям"],
+    relatedTopics: ["sec-grant-revoke", "sec-grant-patterns"]
   },
   "sec-grant-revoke": {
     title: "GRANT и REVOKE",
@@ -2988,7 +3218,8 @@ export const topics = {
       "GRANT ON ALL TABLES — снимок, новые таблицы прав не получат",
       "PUBLIC — псевдо-роль «все остальные», по умолчанию у неё много прав"
     ],
-    learningGoals: ["раздавать минимально нужные права", "пользоваться ALTER DEFAULT PRIVILEGES"]
+    learningGoals: ["раздавать минимально нужные права", "пользоваться ALTER DEFAULT PRIVILEGES"],
+    relatedTopics: ["sec-roles", "sec-grant-patterns"]
   },
   "sec-grant-patterns": {
     title: "Паттерны: readonly / writer / migrator",
@@ -3001,7 +3232,11 @@ export const topics = {
       "Деплой/миграции — отдельный пароль, который можно ротировать",
       "Без INHERIT в роли логина права групп не подхватятся автоматически"
     ],
-    learningGoals: ["разделять группы по обязанностям"]
+    learningGoals: [
+      "разделять роли по обязанностям (readonly / writer / migrator)",
+      "выдавать привилегии группе, а не отдельным пользователям"
+    ],
+    relatedTopics: ["sec-grant-revoke", "sr-rls"]
   },
   "sec-audit": {
     title: "Логирование и аудит",
@@ -3015,7 +3250,8 @@ export const topics = {
       "pgaudit требует shared_preload_libraries и рестарта",
       "Логи и БД должны быть с разным доступом, иначе компрометация снимает аудит"
     ],
-    learningGoals: ["настроить базовый аудит", "не утопить диск логом"]
+    learningGoals: ["настроить базовый аудит", "не утопить диск логом"],
+    relatedTopics: ["sr-observability"]
   },
 
   // ===== Расширения programming.html =====
@@ -3031,7 +3267,8 @@ export const topics = {
       "Большинство драйверов умеют ленивое чтение без явного курсора (libpq single-row, JDBC fetchSize)",
       "MOVE и FETCH не возвращают строки в один аккумулятор — это императивный обход"
     ],
-    learningGoals: ["понимать, когда курсор реально нужен", "отличать DECLARE … CURSOR от FOR … IN"]
+    learningGoals: ["понимать, когда курсор реально нужен", "отличать DECLARE … CURSOR от FOR … IN"],
+    relatedTopics: ["plpgsql"]
   },
   "dynamic-sql": {
     title: "Динамический SQL: EXECUTE",
@@ -3045,7 +3282,8 @@ export const topics = {
       "Значения — через USING, не через format(%L) и не через ||",
       "Конкатенация пользовательского ввода в SQL — классический injection"
     ],
-    learningGoals: ["писать безопасный динамический SQL", "разделять идентификаторы и значения"]
+    learningGoals: ["писать безопасный динамический SQL", "разделять идентификаторы и значения"],
+    relatedTopics: ["sr-prepared-statements", "plpgsql"]
   },
   "sqlstate": {
     title: "Классы ошибок (SQLSTATE)",
@@ -3059,7 +3297,8 @@ export const topics = {
       "Блок с EXCEPTION — это неявный SAVEPOINT, его постоянное использование дорого",
       "P0001 — это RAISE EXCEPTION без указания SQLSTATE"
     ],
-    learningGoals: ["понимать классы 22/23/40/42", "выбирать имя условия, а не код"]
+    learningGoals: ["понимать классы 22/23/40/42", "выбирать имя условия, а не код"],
+    relatedTopics: ["raise-using", "err-deadlock"]
   },
   "raise-using": {
     title: "Кастомные ошибки: RAISE … USING",
@@ -3072,7 +3311,8 @@ export const topics = {
       "ERRCODE можно задавать именем ('invalid_parameter_value') или 5-символьным кодом",
       "RAISE без аргументов внутри EXCEPTION — перевыбросить текущую ошибку"
     ],
-    learningGoals: ["писать осмысленные ошибки", "пользоваться полями HINT/DETAIL"]
+    learningGoals: ["писать осмысленные ошибки", "пользоваться полями HINT/DETAIL"],
+    relatedTopics: ["plpgsql", "sqlstate"]
   },
   "returns-table-setof": {
     title: "RETURNS TABLE vs SETOF",
@@ -3086,7 +3326,8 @@ export const topics = {
       "RETURNS TABLE — это сахар над OUT-параметрами + SETOF record",
       "Меняя тип таблицы, ты можешь сломать все RETURNS SETOF этой таблицы"
     ],
-    learningGoals: ["выбирать форму результата сознательно", "понимать связь TABLE и OUT"]
+    learningGoals: ["выбирать форму результата сознательно", "понимать связь TABLE и OUT"],
+    relatedTopics: ["functions-procedures", "lateral-join"]
   },
 
   // ===== Упражнения =====

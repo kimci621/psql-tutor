@@ -24,6 +24,7 @@
 
     <section class="category">
       <h2>1. Агрегатные функции</h2>
+      <p class="sub">SUM, COUNT, AVG, MIN, MAX и их поведение с NULL. Базис, без которого нельзя ни считать выручку, ни строить отчёты.</p>
 
       <article class="topic" id="aggregates-funcs">
         <h3>count, sum, avg, min, max, string_agg, array_agg</h3>
@@ -54,6 +55,7 @@ FROM   orders;</pre>
 
     <section class="category">
       <h2>2. JSON_AGG vs ORM</h2>
+      <p class="sub">Когда из БД нужен один JSON со всеми связанными записями — Postgres умеет собрать его одним запросом. Это часто эффективнее, чем тянуть N+1 через ORM.</p>
 
       <article class="topic" id="json-agg-vs-orm">
         <h3>Агрегация в JSON: один запрос вместо N+1</h3>
@@ -92,6 +94,7 @@ ORDER  BY u.id;</pre>
 
     <section class="category">
       <h2>3. CASE WHEN</h2>
+      <p class="sub">Условное выражение прямо в SELECT. Незаменимо для расчётов «по правилам» и в комбинации с агрегатами даёт сводные таблицы.</p>
 
       <article class="topic" id="case-when">
         <h3>Условные выражения</h3>
@@ -127,6 +130,7 @@ FROM   orders;</pre>
 
     <section class="category">
       <h2>4. Группировка и фильтрация</h2>
+      <p class="sub">GROUP BY, HAVING и DISTINCT. Где правильно класть условие — в WHERE или HAVING — и чем отличается DISTINCT от GROUP BY.</p>
 
       <article class="topic" id="having">
         <h3>HAVING — фильтр после агрегации</h3>
@@ -206,6 +210,7 @@ GROUP  BY GROUPING SETS ((country), (gender), ());</pre>
 
     <section class="category">
       <h2>5. Подзапросы</h2>
+      <p class="sub">Запрос внутри запроса: коррелированный и некоррелированный, в SELECT/WHERE/FROM. CTE как читаемая альтернатива.</p>
 
       <article class="topic" id="subqueries">
         <h3>Скалярные, табличные, коррелированные</h3>
@@ -247,6 +252,7 @@ WHERE  EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);</pre>
 
     <section class="category">
       <h2>6. UNION, EXCEPT, INTERSECT</h2>
+      <p class="sub">Операции над множествами результатов. Объединение, разность, пересечение — и в чём разница UNION vs UNION ALL.</p>
 
       <article class="topic" id="set-ops">
         <h3>Операции над множествами</h3>

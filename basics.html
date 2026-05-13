@@ -287,6 +287,7 @@ JOIN   orders o ON o.user_id = u.id;</pre>
 
     <section class="category">
       <h2>5. Реляционные vs нереляционные</h2>
+      <p class="sub">Когда выбирать Postgres, а когда документную БД или key-value. Главное — не «модно/не модно», а характер данных и связей.</p>
 
       <article class="topic concept" id="relational-vs-nosql">
         <h3>Реляционные vs нереляционные СУБД</h3>
@@ -302,6 +303,7 @@ JOIN   orders o ON o.user_id = u.id;</pre>
 
     <section class="category">
       <h2>6. Последовательности</h2>
+      <p class="sub">Откуда берутся автоинкрементные id и почему сиквенс — это отдельный объект, а не свойство колонки. Понимание этого спасает при импорте данных и копировании таблиц.</p>
 
       <article class="topic" id="sequences">
         <h3>SEQUENCE — генератор номеров</h3>
@@ -326,6 +328,7 @@ ALTER  SEQUENCE order_no_seq RESTART WITH 1;</pre>
 
     <section class="category">
       <h2>7. Анатомия кластера</h2>
+      <p class="sub">Как Postgres физически хранит данные: кластер → база → схема → tablespace → файл → страница. Этой картинки достаточно, чтобы перестать путать «БД» и «кластер».</p>
 
       <article class="topic" id="cluster-anatomy">
         <h3>Кластер → БД → схема → tablespace → файл → страница</h3>

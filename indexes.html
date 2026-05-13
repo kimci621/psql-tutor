@@ -24,6 +24,7 @@
 
     <section class="category">
       <h2>1. Составные и уникальные</h2>
+      <p class="sub">Индекс на нескольких столбцах работает иначе, чем два отдельных индекса. Здесь — порядок столбцов в составном индексе и роль UNIQUE.</p>
 
       <article class="topic" id="composite-index">
         <h3>Составные индексы (несколько колонок)</h3>
@@ -77,6 +78,7 @@ CREATE UNIQUE INDEX idx_users_email_active
 
     <section class="category">
       <h2>2. Селективность</h2>
+      <p class="sub">Чем выше уникальность ключа, тем эффективнее индекс. Поэтому индекс на boolean-флаг почти всегда бесполезен, а индекс на user_id обычно хороший.</p>
 
       <article class="topic" id="selectivity">
         <h3>Селективность и почему планировщик выбирает Seq Scan</h3>
@@ -108,6 +110,7 @@ EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM orders WHERE status = 'pending';</pre>
 
     <section class="category">
       <h2>3. По выражению и покрывающие</h2>
+      <p class="sub">Индекс не обязан быть на самой колонке — можно индексировать выражение (например, lower(email)). И иногда удобно положить дополнительные колонки прямо в индекс, чтобы план не дёргал таблицу.</p>
 
       <article class="topic" id="expression-index">
         <h3>Индекс по выражению</h3>
@@ -163,6 +166,7 @@ WHERE  user_id = 1
 
     <section class="category">
       <h2>4. Типы индексов</h2>
+      <p class="sub">B-tree — дефолт; GIN — для массивов, JSONB и полнотекста; GiST/SP-GiST — для геометрии и нечёткого поиска; BRIN — для гигантских отсортированных таблиц. У каждого свой сценарий.</p>
 
       <article class="topic" id="index-types">
         <h3>B-tree, GIN, GiST, SP-GiST, BRIN, Hash</h3>
@@ -209,6 +213,7 @@ CREATE INDEX idx_sessions_token ON sessions USING hash (token);</pre>
 
     <section class="category">
       <h2>5. Статистика и N+1</h2>
+      <p class="sub">Индекс — это не магия. Если планировщик о нём «забыл», обычно дело в устаревшей статистике или в неверной селективности. Здесь — ANALYZE и типичные ловушки.</p>
 
       <article class="topic" id="stats-extended">
         <h3>Расширенная статистика</h3>
@@ -258,6 +263,7 @@ GROUP  BY user_id;</pre>
 
     <section class="category">
       <h2>6. Связанные темы</h2>
+      <p class="sub">Где ещё на сайте темы, перекликающиеся с индексами.</p>
       <article class="topic concept">
         <h3>Где ещё про индексы</h3>
         <div class="desc">
@@ -332,6 +338,7 @@ GROUP  BY user_id;</pre>
 
     <section class="category">
       <h2>Визуализация EXPLAIN: до и после</h2>
+      <p class="sub">Два плана одной и той же выборки — до индекса и после. Покажет, как Index Scan заменяет Seq Scan и насколько это меняет стоимость.</p>
       <article class="topic" id="explain-before-after">
         <h3>Один и тот же запрос: с индексом и без</h3>
         <p class="summary">Простой пример, показывающий, как меняется план после добавления индекса.</p>

@@ -24,6 +24,7 @@
 
     <section class="category">
       <h2>1. Базовые JOIN-ы</h2>
+      <p class="sub">Главная операция реляционной БД — соединение таблиц по совпадению значений. Сначала разбираемся с тремя китами (INNER / LEFT / FULL) и одной классической ошибкой: условие на нулевую сторону, ушедшее в WHERE.</p>
 
       <article class="topic" id="inner-join">
         <h3>INNER JOIN</h3>
@@ -152,6 +153,7 @@ SELECT * FROM orders o JOIN payments p ON p.order_id = o.id;</pre>
 
     <section class="category">
       <h2>2. Полу- и анти-соединения</h2>
+      <p class="sub">Когда нужно «есть ли вообще совпадение» или «совпадений нет» — обычный JOIN неудобен, потому что дублирует строки. EXISTS и его отрицание решают это корректнее.</p>
 
       <article class="topic" id="semi-join">
         <h3>SEMI JOIN: EXISTS / IN</h3>
@@ -210,6 +212,7 @@ WHERE  id NOT IN (SELECT user_id FROM orders);  -- ловушка с NULL</pre>
 
     <section class="category">
       <h2>3. Многотабличные запросы и связи</h2>
+      <p class="sub">В реальной схеме редко всё помещается в две таблицы. Здесь — самосоединения, последовательные JOIN-ы, связи через промежуточные таблицы и USING вместо ON.</p>
 
       <article class="topic" id="multi-table-join">
         <h3>Соединение более двух таблиц</h3>
