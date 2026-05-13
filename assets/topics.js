@@ -1055,6 +1055,452 @@ export const topics = {
     relatedTopics: ["sr-explain-deep", "cfg-shared-buffers", "cfg-work-mem"]
   },
 
+  "sr-pgbench": {
+    title: "pgbench — нагрузочное тестирование PostgreSQL",
+    summary: "Идёт в комплекте с Postgres, готов к работе из коробки. Базовый сценарий (TPC-B-like) хорош для сравнения железа и настроек; кастомные скрипты — для проверки своего профиля нагрузки.",
+    examples: [
+      "# инициализация (создаст таблицы pgbench_*):\npgbench -i -s 100 -h localhost -U postgres bench\n# -s 100 = scale 100 ≈ 1.6 ГБ данных. 1000 ≈ 16 ГБ.\n\n# базовый прогон: 50 клиентов, 4 потока, 5 минут\npgbench -h localhost -U postgres -c 50 -j 4 -T 300 -P 10 bench\n# -P 10 = печатать промежуточный TPS каждые 10 сек\n\n# только чтение (read-only сценарий):\npgbench -c 50 -j 4 -T 300 -S bench",
+      "# кастомный скрипт под свой профиль:\n# my_bench.sql:\n# \\set uid random(1, 100000)\n# SELECT * FROM users WHERE id = :uid;\n# SELECT count(*) FROM orders WHERE user_id = :uid;\n\npgbench -c 100 -j 8 -T 300 -f my_bench.sql -P 10 app",
+      "# смешанный сценарий (90% read / 10% write):\npgbench -c 50 -j 4 -T 300 \\\n  -f read.sql@9 \\\n  -f write.sql@1 \\\n  -P 10 app\n\n# подключение через PgBouncer — сравнить с прямым подключением:\npgbench -h pgbouncer.internal -p 6432 -c 200 -j 16 -T 300 bench",
+      "# вывод:\n# tps = 3421.5 (without initial connection time)\n# latency average = 14.6 ms\n# initial connection time = 23 ms\n# что смотреть: tps, p95-латенси (через --report-per-command), стабильность TPS на интервалах"
+    ],
+    pitfalls: [
+      "Сравнивать TPS на разных scale-факторах нельзя: pgbench с -s 1 → всё в кеше, цифры космические; -s 1000 → реальный диск",
+      "TPS pgbench != TPS приложения. У реального приложения другие запросы, другие соединения, другие latency-распределения",
+      "На coffee-cup-нагрузке (-c 1 -j 1) ты измеряешь не Postgres, а сетевой round-trip к клиенту. Минимум -c 10 -j 4",
+      "Initial-connection-time иногда занимает 95% всего теста. -T 300 = 5 минут — это минимум; короче — пьяные цифры",
+      "Без -P видишь только итог; не заметишь, что в середине теста TPS просел в 5 раз из-за чекпойнта"
+    ],
+    learningGoals: [
+      "запускать стандартный pgbench под свою БД и интерпретировать результат",
+      "писать кастомный сценарий через -f",
+      "понимать ограничения: pgbench != «производительность приложения»"
+    ],
+    relatedTopics: ["sr-explain-deep", "sr-pg-stat-statements", "tools-overview", "sr-pgbouncer"]
+  },
+
+  "sr-hierarchies": {
+    title: "Иерархии в таблице: parent_id, materialized path, closure table",
+    summary: "Три способа хранить дерево/граф (категории, комментарии, организационная структура). У каждого свой профиль чтения и записи — выбор зависит от того, что важнее.",
+    examples: [
+      "-- 1) Adjacency list (parent_id) — самый частый и простой:\nCREATE TABLE categories (\n  id        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  parent_id bigint REFERENCES categories(id),\n  name      text NOT NULL\n);\n\n-- получить всех потомков узла #1 — WITH RECURSIVE:\nWITH RECURSIVE descendants AS (\n  SELECT id, parent_id, name, 1 AS depth\n  FROM   categories WHERE id = 1\n  UNION ALL\n  SELECT c.id, c.parent_id, c.name, d.depth + 1\n  FROM   categories c\n  JOIN   descendants d ON c.parent_id = d.id\n)\nSELECT * FROM descendants;",
+      "-- 2) Materialized path — путь хранится как строка/массив:\nCREATE TABLE categories_mp (\n  id   bigint PRIMARY KEY,\n  path ltree NOT NULL,           -- '1.4.7.42'\n  name text NOT NULL\n);\nCREATE EXTENSION IF NOT EXISTS ltree;\nCREATE INDEX idx_categories_mp_path ON categories_mp USING gist (path);\n\n-- все потомки узла '1.4.7' — один запрос без recursive:\nSELECT * FROM categories_mp WHERE path <@ '1.4.7';\n-- предки узла:\nSELECT * FROM categories_mp WHERE path @> '1.4.7.42.99';",
+      "-- 3) Closure table — отдельная таблица «предок-потомок» для каждой пары:\nCREATE TABLE categories_cl (id bigint PRIMARY KEY, name text);\nCREATE TABLE categories_closure (\n  ancestor   bigint NOT NULL REFERENCES categories_cl(id),\n  descendant bigint NOT NULL REFERENCES categories_cl(id),\n  depth      int    NOT NULL,\n  PRIMARY KEY (ancestor, descendant)\n);\nCREATE INDEX ON categories_closure (descendant);\n\n-- все предки узла:\nSELECT c.* FROM categories_closure cl\nJOIN   categories_cl c ON c.id = cl.ancestor\nWHERE  cl.descendant = 42;\n\n-- INSERT и MOVE дороги — поддерживать closure через триггеры."
+    ],
+    pitfalls: [
+      "parent_id + recursive CTE — самый общий вариант, но чтение всех потомков может быть дорогим на глубоких деревьях. Под чтение оптимизируют materialized path или closure",
+      "Materialized path требует обновления path при перемещении узла — каскадом для всех потомков. Запись дороже, чтение дешевле",
+      "Closure table — самое быстрое чтение «все предки/потомки», но запись = O(глубина); MOVE подузла = пересоздать все его пары",
+      "ltree (Postgres-расширение) даёт операторы <@ / @> / lquery / lca и GiST-индекс — лучший выбор для materialized path в Postgres",
+      "Не делай DFS/BFS на стороне приложения через N запросов — это лекарство хуже болезни. WITH RECURSIVE в БД всегда дешевле"
+    ],
+    learningGoals: [
+      "выбирать adjacency / path / closure по профилю чтения и записи",
+      "писать WITH RECURSIVE для adjacency list",
+      "использовать ltree для materialized path"
+    ],
+    relatedTopics: ["recursive-cte", "self-join", "rel-one-to-many", "gin-index"]
+  },
+
+  "sr-normalization": {
+    title: "Нормализация и денормализация",
+    summary: "Нормализация — про защиту от противоречий: каждый факт хранится в одном месте. Денормализация — осознанный шаг назад ради чтения. Кто умеет говорить и то, и другое, не путая, — у того схема выживает.",
+    examples: [
+      "-- 1NF: все колонки атомарны (никаких 'tag1,tag2,tag3' в одной строке)\n-- НАРУШЕНИЕ:\nCREATE TABLE posts (id int, tags text);  -- tags = 'sql,db,postgres'\n-- НОРМА:\nCREATE TABLE posts (id int);\nCREATE TABLE post_tags (post_id int, tag text, PRIMARY KEY (post_id, tag));",
+      "-- 2NF: неключевые колонки зависят от ВСЕГО PK, не от его части\n-- НАРУШЕНИЕ:\nCREATE TABLE order_items (\n  order_id int, product_id int,\n  qty int,\n  product_name text,   -- зависит только от product_id, не от обоих\n  PRIMARY KEY (order_id, product_id)\n);\n-- НОРМА: product_name переезжает в products",
+      "-- 3NF: неключевые колонки НЕ зависят от других неключевых\n-- НАРУШЕНИЕ:\nCREATE TABLE users (id int PRIMARY KEY, country_code text, country_name text);\n--                                          country_name → зависит от country_code\n-- НОРМА: countries(code PK, name); users (..., country_code FK)",
+      "-- денормализация — осознанная, под конкретный запрос\nALTER TABLE users ADD COLUMN orders_count int NOT NULL DEFAULT 0;\n-- держим в актуальности триггером:\nCREATE FUNCTION bump_orders_count() RETURNS trigger AS $$\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    UPDATE users SET orders_count = orders_count + 1 WHERE id = NEW.user_id;\n  ELSIF TG_OP = 'DELETE' THEN\n    UPDATE users SET orders_count = orders_count - 1 WHERE id = OLD.user_id;\n  END IF;\n  RETURN NULL;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER orders_count_trg\n  AFTER INSERT OR DELETE ON orders\n  FOR EACH ROW EXECUTE FUNCTION bump_orders_count();",
+      "-- EAV-антипаттерн (Entity-Attribute-Value): «гибкая» схема через 3 колонки\n-- ❌ почти всегда плохо:\nCREATE TABLE attributes (entity_id int, key text, value text);\n-- Запрос «дай мне все товары с цветом=red и размером=M» → 2 JOIN'а к самой себе.\n-- Решение: либо jsonb, либо нормальная схема с колонками."
+    ],
+    pitfalls: [
+      "«Денормализация для производительности» в 80% случаев — оправдание ошибки в индексах. Сначала EXPLAIN, потом денормализация",
+      "EAV (entity-attribute-value) — антипаттерн: невозможно индексировать, невозможно типизировать, JOIN на каждый запрос. Если поля плавают — jsonb",
+      "Денормализованное поле требует синхронизации (триггер / materialized view / приложение). Забудешь — данные разъедутся",
+      "1NF строго говоря запрещает массивы, но Postgres-массив — компромисс: атомарный для движка, но удобный для тегов",
+      "Materialized view — это тоже денормализация, только декларативная. REFRESH CONCURRENTLY (PG 9.4+) делает её приемлемой для прода"
+    ],
+    learningGoals: [
+      "видеть нарушения 1NF/2NF/3NF на пальцах",
+      "не путать «денормализация» с «убрать FK»",
+      "распознавать EAV-антипаттерн и предлагать jsonb или нормальную схему"
+    ],
+    relatedTopics: ["keys-pk-fk", "rel-one-to-many", "rel-many-to-many", "types-jsonb", "materialized-view", "triggers"]
+  },
+
+  "sr-extensions-ecosystem": {
+    title: "Экосистема расширений PostgreSQL",
+    summary: "Postgres сильнее, чем кажется по коробке. Десяток зрелых расширений закрывают геопоиск, time-series, аудит, планирование заданий, гипотетические индексы, измерение bloat. Знать их — то же, что senior отличается от middle.",
+    examples: [
+      "-- общий механизм:\nSELECT * FROM pg_available_extensions ORDER BY name;\nCREATE EXTENSION IF NOT EXISTS extname;\nSELECT * FROM pg_extension;     -- что включено в этой БД",
+      "-- топовые расширения по применимости:\n-- pg_stat_statements  — top тяжёлых запросов (есть отдельная тема)\n-- pg_trgm             — fuzzy/подстрочный поиск (есть отдельная тема)\n-- pgcrypto            — gen_random_uuid, hashing, симметричное шифрование\n-- citext              — case-insensitive text без lower() в каждом запросе\n-- hstore              — legacy key/value, сейчас почти всегда заменяется jsonb\n-- uuid-ossp           — UUID v1/v3/v4/v5 (новый код берёт gen_random_uuid из pgcrypto)",
+      "-- эксплуатация:\n-- postgis        — индустриальный стандарт геоданных\n-- timescaledb    — hypertables + continuous aggregates для time-series\n-- pg_partman     — автоматическая ротация партиций\n-- pg_cron        — планировщик задач прямо в БД (cron-синтаксис)\n-- pg_repack      — упаковка таблиц без блокировки\n-- pgaudit        — аудит DDL/DML с детальной фильтрацией\n-- pgstattuple    — точное измерение bloat\n-- hypopg         — гипотетические индексы: «что было бы, если добавить»",
+      "-- пример: pg_cron поверх Postgres:\nCREATE EXTENSION IF NOT EXISTS pg_cron;\n\nSELECT cron.schedule(\n  'cleanup-old-events',\n  '0 3 * * *',                                  -- каждый день в 3:00\n  $$ DELETE FROM events WHERE ts < now() - interval '90 days' $$\n);\n\nSELECT * FROM cron.job;\nSELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 20;",
+      "-- пример: hypopg — проверить индекс до создания\nCREATE EXTENSION IF NOT EXISTS hypopg;\nSELECT hypopg_create_index('CREATE INDEX ON orders (user_id, created_at DESC)');\nEXPLAIN SELECT * FROM orders WHERE user_id = 1 ORDER BY created_at DESC;\n-- если план поменялся — значит, индекс реально поможет. Сбросить:\nSELECT hypopg_reset();"
+    ],
+    pitfalls: [
+      "Managed-сервисы (RDS, Cloud SQL) часто разрешают только whitelisted расширения. Перед миграцией — сверить со списком провайдера",
+      "CREATE EXTENSION требует SUPERUSER (для большинства). На managed-сервисах есть отдельная роль или web-консоль для установки",
+      "Не все расширения переживают мажорный upgrade Postgres без обновления самого расширения. Проверять на staging",
+      "hypopg-индексы НЕ существуют физически, не помогают реальным запросам и видны только в EXPLAIN — это инструмент исследования, не оптимизации",
+      "Каждое расширение = поверхность атаки. На проде ставим только то, что действительно нужно"
+    ],
+    learningGoals: [
+      "знать топ-10 расширений и под какие задачи",
+      "ставить расширение и проверять, что оно есть на managed-сервисе",
+      "пользоваться hypopg для проверки идеи индекса"
+    ],
+    relatedTopics: ["sr-pg-stat-statements", "sr-pg-trgm", "sr-fulltext", "sr-time-series", "sr-bloat"]
+  },
+
+  "sr-time-series": {
+    title: "Time-series в Postgres",
+    summary: "Постгрес без расширений справляется с миллиардами event-строк, если правильно расставить три кирпича: partition by range (ts), BRIN-индекс на ts, и автоматизация ротации через pg_partman. Для серьёзной аналитики поверх — TimescaleDB.",
+    examples: [
+      "-- партиционированная таблица событий по месяцам:\nCREATE TABLE events (\n  id   bigint GENERATED ALWAYS AS IDENTITY,\n  ts   timestamptz NOT NULL,\n  user_id bigint NOT NULL,\n  data jsonb,\n  PRIMARY KEY (id, ts)\n) PARTITION BY RANGE (ts);\n\nCREATE TABLE events_2026_05 PARTITION OF events\n  FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');\n\n-- BRIN — идеальный индекс для append-only по времени:\nCREATE INDEX idx_events_ts_brin ON events USING brin (ts)\n  WITH (pages_per_range = 32);",
+      "-- pg_partman — автоматическая ротация партиций:\nCREATE EXTENSION IF NOT EXISTS pg_partman;\n\nSELECT partman.create_parent(\n  p_parent_table => 'public.events',\n  p_control      => 'ts',\n  p_type         => 'range',\n  p_interval     => '1 month',\n  p_premake      => 4  -- держим 4 будущих партиции готовыми\n);\n\n-- ретеншн: дропать партиции старше 12 месяцев:\nUPDATE partman.part_config\nSET    retention = '12 months', retention_keep_table = false\nWHERE  parent_table = 'public.events';\n\n-- запускать ротацию (обычно из cron):\nSELECT run_maintenance();",
+      "-- TimescaleDB — Postgres-расширение, превращающее таблицу в гиперт-таблицу:\nCREATE EXTENSION IF NOT EXISTS timescaledb;\n\nSELECT create_hypertable('events', 'ts', chunk_time_interval => interval '1 day');\n\n-- continuous aggregates — materialized views, которые обновляются автоматически:\nCREATE MATERIALIZED VIEW events_hourly\nWITH (timescaledb.continuous) AS\nSELECT time_bucket('1 hour', ts) AS bucket,\n       user_id, count(*)\nFROM events\nGROUP BY bucket, user_id;"
+    ],
+    pitfalls: [
+      "BRIN ускоряет ТОЛЬКО когда таблица отсортирована по индексируемому полю физически — это естественно для append-only event-stream. На таблице с UPDATE в произвольном порядке BRIN бесполезен",
+      "Партиционирование без ротации = таблиц станет тысячи и план каждый раз будет тяжелее. pg_partman автоматизирует, но его cron должен реально запускаться",
+      "TimescaleDB лицензия: open core + community + commercial. Continuous aggregates — community, не во всех managed-сервисах есть",
+      "Не забыть PRIMARY KEY включает partition key — иначе ALTER TABLE на партицированной таблице не пройдёт",
+      "На write-heavy time-series autovacuum часто отстаёт — поднимай scale_factor и naptime"
+    ],
+    learningGoals: [
+      "проектировать партиционированную event-таблицу с BRIN",
+      "автоматизировать ротацию через pg_partman",
+      "понимать, что добавляет TimescaleDB поверх обычного Postgres"
+    ],
+    relatedTopics: ["sr-partitioning", "create-index-btree", "sr-bloat", "cfg-autovacuum"]
+  },
+
+  "sr-fdw": {
+    title: "Foreign Data Wrappers (postgres_fdw)",
+    summary: "FDW даёт обращаться к чужой БД как к локальной таблице. postgres_fdw — самый зрелый: Postgres-to-Postgres. Также есть file_fdw, mysql_fdw, mongo_fdw, oracle_fdw — экосистема расширений.",
+    examples: [
+      "-- подключение к другой Postgres-БД:\nCREATE EXTENSION IF NOT EXISTS postgres_fdw;\n\nCREATE SERVER reports_db\n  FOREIGN DATA WRAPPER postgres_fdw\n  OPTIONS (host 'reports.internal', port '5432', dbname 'analytics');\n\nCREATE USER MAPPING FOR app_user\n  SERVER reports_db\n  OPTIONS (user 'app_reader', password '...');\n\n-- IMPORT FOREIGN SCHEMA — массовое создание foreign-таблиц:\nIMPORT FOREIGN SCHEMA public\n  LIMIT TO (orders, line_items)\n  FROM SERVER reports_db INTO ext;",
+      "-- использование выглядит как обычная таблица:\nSELECT u.email, count(o.id)\nFROM   users u                       -- локальная\nLEFT JOIN ext.orders o ON o.user_id = u.id    -- foreign\nGROUP  BY u.email;",
+      "-- посмотреть, что Postgres pushed-down на удалённую сторону:\nEXPLAIN (VERBOSE, ANALYZE) SELECT ...;\n-- ищи 'Remote SQL' — то, что реально ушло на reports_db.\n\n-- CSV через file_fdw:\nCREATE EXTENSION IF NOT EXISTS file_fdw;\nCREATE SERVER files FOREIGN DATA WRAPPER file_fdw;\nCREATE FOREIGN TABLE logs (\n  ts text, level text, msg text\n) SERVER files OPTIONS (filename '/var/log/app.csv', format 'csv', header 'true');"
+    ],
+    pitfalls: [
+      "Pushdown — главный плюс postgres_fdw. Без него любой JOIN тянет всю таблицу через сеть. Помогают use_remote_estimate и async_capable",
+      "Транзакционность ОДНОСТОРОННЯЯ: BEGIN на локальной — это не BEGIN на удалённой. Двух-фазный commit (2PC) FDW не использует",
+      "user mapping хранит пароль в pg_user_mappings — доступен суперпользователю; для прода — sslmode=verify-full и/или scram",
+      "Foreign-таблицы не индексируются локально (нет смысла) — фильтры должны pushdown'иться на удалённую сторону. Если не идёт — переписывать запрос",
+      "Не путать FDW с logical replication: FDW — синхронные запросы по требованию, repl — асинхронный поток событий"
+    ],
+    learningGoals: [
+      "создавать SERVER, USER MAPPING, FOREIGN TABLE",
+      "видеть Remote SQL в EXPLAIN и понимать pushdown",
+      "выбирать между FDW и logical replication"
+    ],
+    relatedTopics: ["sr-logical-decoding-cdc", "sr-replication", "tools-overview"]
+  },
+
+  "sr-logical-decoding-cdc": {
+    title: "Logical decoding и CDC",
+    summary: "Logical decoding превращает WAL в поток событий «строка изменена». На этом строятся CDC-конвейеры (Debezium, wal2json) и репликация между гетерогенными БД. Без понимания replica identity и слотов это не запустить.",
+    examples: [
+      "-- включаем logical-уровень WAL (нужен restart кластера):\nALTER SYSTEM SET wal_level = 'logical';\nALTER SYSTEM SET max_replication_slots = 10;\nALTER SYSTEM SET max_wal_senders = 10;\n-- restart обязателен!",
+      "-- replica identity: что попадает в WAL при UPDATE/DELETE\n-- DEFAULT — только PK; для таблиц без PK это проблема:\nALTER TABLE events REPLICA IDENTITY FULL;     -- вся старая строка\nALTER TABLE events REPLICA IDENTITY USING INDEX idx_events_user; -- по конкретному уникальному индексу",
+      "-- создать logical slot и стрим через pgoutput (нативный плагин):\nSELECT pg_create_logical_replication_slot('cdc_app', 'pgoutput');\n\n-- через wal2json — события в JSON:\nSELECT pg_create_logical_replication_slot('cdc_json', 'wal2json');\n\nSELECT data\nFROM   pg_logical_slot_peek_changes('cdc_json', NULL, NULL,\n         'pretty-print', '1',\n         'include-timestamp', 'on');",
+      "-- Debezium для production: подключается через replication-протокол,\n-- читает WAL через pgoutput / wal2json и пишет события в Kafka.\n-- Postgres-сторона:\nCREATE PUBLICATION debezium_pub FOR TABLE orders, users;\nCREATE USER debezium WITH REPLICATION PASSWORD '...';\nGRANT SELECT ON orders, users TO debezium;"
+    ],
+    pitfalls: [
+      "Заброшенный logical slot — главная причина «диск кончился». Postgres держит WAL для подписчика; если воркер мёртв, WAL копится. Мониторь pg_replication_slots.confirmed_flush_lsn",
+      "REPLICA IDENTITY DEFAULT и таблица без PK = UPDATE/DELETE летят в WAL без идентификации строки. CDC ловит «событие без before-state»",
+      "REPLICA IDENTITY FULL пишет всю строку в WAL — дорого на write-heavy таблицах. Используй только там, где нужно",
+      "Logical replication НЕ передаёт DDL. ALTER TABLE на источнике надо повторить вручную на приёмнике",
+      "Не путать с physical replication (тот стримит WAL побайтно). Logical работает поверх — нужен logical wal_level"
+    ],
+    learningGoals: [
+      "включать logical wal_level и понимать его цену",
+      "выбирать REPLICA IDENTITY под нужды CDC",
+      "ловить и чинить разрастание logical slot"
+    ],
+    relatedTopics: ["sr-replication", "sr-physical-vs-logical", "sr-replication-slots", "sr-outbox"]
+  },
+
+  "sr-idempotency": {
+    title: "Идемпотентность операций",
+    summary: "Любая надёжная распределённая система делает один и тот же запрос дважды. Идемпотентность — это когда второй раз ничего не происходит. В Postgres основной инструмент — UNIQUE + ON CONFLICT и идемпотентный ключ.",
+    examples: [
+      "-- идемпотентный INSERT через ON CONFLICT DO NOTHING:\nINSERT INTO orders (id, user_id, total, idempotency_key)\nVALUES ($1, $2, $3, $4)\nON CONFLICT (idempotency_key) DO NOTHING\nRETURNING id;\n-- если ничего не вернулось — запись уже была, второй раз — нет операции.",
+      "-- идемпотентный UPSERT через ON CONFLICT DO UPDATE:\nINSERT INTO inventory (sku, in_stock) VALUES ($1, $2)\nON CONFLICT (sku) DO UPDATE\n  SET in_stock = inventory.in_stock + EXCLUDED.in_stock;\n\n-- ВАЖНО: in_stock + EXCLUDED.in_stock — НЕ идемпотентно (повтор увеличит дважды).\n-- Идемпотентный вариант: сохранять последнее значение, не складывать.\nON CONFLICT (sku) DO UPDATE SET in_stock = EXCLUDED.in_stock;",
+      "-- идемпотентные миграции через таблицу-журнал:\nCREATE TABLE schema_migrations (\n  version    text PRIMARY KEY,\n  applied_at timestamptz NOT NULL DEFAULT now()\n);\n\nDO $$\nBEGIN\n  IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '2026_05_13_add_email_norm') THEN\n    ALTER TABLE users ADD COLUMN email_norm text;\n    INSERT INTO schema_migrations (version) VALUES ('2026_05_13_add_email_norm');\n  END IF;\nEND$$;",
+      "-- идемпотентный outbox-воркер: SKIP LOCKED + помечаем published_at\n-- (повторный запуск не повторит публикацию):\nUPDATE outbox\nSET    published_at = now()\nWHERE  id IN (\n  SELECT id FROM outbox\n  WHERE  published_at IS NULL\n  ORDER  BY id\n  LIMIT  100\n  FOR UPDATE SKIP LOCKED\n)\nRETURNING id, topic, payload;"
+    ],
+    pitfalls: [
+      "Самый частый антипаттерн: «in_stock + EXCLUDED.in_stock» — выглядит идемпотентно, но повтор удваивает значение",
+      "ON CONFLICT (col) требует UNIQUE-индекс на col. Без него — синтаксическая ошибка",
+      "Идемпотентность по бизнес-ключу (idempotency_key) важнее, чем по PK: PK ставится автоматически и НЕ совпадает между повторами",
+      "Без RETURNING невозможно отличить «вставили» от «уже было» — для аналитики и логов это критично",
+      "Идемпотентные миграции через таблицу-журнал — единственный способ накатывать их повторно после провала на середине"
+    ],
+    learningGoals: [
+      "писать идемпотентные INSERT/UPSERT через ON CONFLICT",
+      "проектировать idempotency-ключ для API",
+      "делать миграции, которые можно повторить после провала"
+    ],
+    relatedTopics: ["upsert", "sr-outbox", "sr-zero-downtime-migrations", "sr-optimistic-locking"]
+  },
+
+  "sr-optimistic-locking": {
+    title: "Оптимистичные блокировки и soft delete",
+    summary: "Альтернатива SELECT FOR UPDATE: не блокировать строку, а проверять на UPDATE, что её никто не изменил. Через явный счётчик `version` или через системный `xmin`. На read-heavy сценариях намного дешевле.",
+    examples: [
+      "-- паттерн с явным version-столбцом:\nCREATE TABLE accounts (\n  id      bigint PRIMARY KEY,\n  balance numeric NOT NULL,\n  version int NOT NULL DEFAULT 0\n);\n\n-- транзакция приложения (псевдо):\n--   1. читаем  SELECT balance, version FROM accounts WHERE id = $1;\n--   2. думаем  newBalance = balance - 100;\n--   3. пишем  UPDATE accounts\n--             SET balance = $newBalance, version = version + 1\n--             WHERE id = $1 AND version = $version;\n--   4. если updated_rows = 0 → кто-то опередил, retry от шага 1.",
+      "-- то же через системный xmin (без лишнего столбца):\nSELECT id, balance, xmin FROM accounts WHERE id = $1;\n-- … затем\nUPDATE accounts\nSET    balance = $newBalance\nWHERE  id = $1 AND xmin = $xmin\nRETURNING xmin;",
+      "-- soft delete вместо физического DELETE:\nALTER TABLE users ADD COLUMN deleted_at timestamptz;\n\n-- частичный UNIQUE-индекс — позволяет переиспользовать email\n-- после удаления, не сломав FK на исторические записи:\nCREATE UNIQUE INDEX users_email_active_uq\n  ON users (email) WHERE deleted_at IS NULL;\n\n-- частичные индексы для запросов «живых» строк:\nCREATE INDEX users_active ON users (id) WHERE deleted_at IS NULL;"
+    ],
+    pitfalls: [
+      "Оптимистичная блокировка требует retry-логики в приложении. Если её нет — конкурентный update просто молча «исчезает», ученик не понимает «почему»",
+      "version-счётчик и xmin не защищают от write skew на разных строках. Для инварианта типа «врачей в смене не меньше двух» нужен SERIALIZABLE",
+      "Soft delete = WHERE deleted_at IS NULL на КАЖДОМ запросе. Забыл — отдал клиенту удалённую запись. Хорошо помогает views или RLS",
+      "xmin сменяется при VACUUM FREEZE — нельзя хранить долго и сравнивать через дни",
+      "Не путать с пессимистичной SELECT FOR UPDATE: оптимистичная не блокирует, а гонится"
+    ],
+    learningGoals: [
+      "реализовать compare-and-swap через version или xmin",
+      "выбирать между оптимистичной блокировкой и FOR UPDATE",
+      "проектировать частичные индексы для soft delete"
+    ],
+    relatedTopics: ["transactions", "iso-summary", "sr-mvcc-snapshot", "partial-index", "sr-idle-in-transaction"]
+  },
+
+  "sr-generated-columns": {
+    title: "Generated columns + expression-индексы",
+    summary: "GENERATED ALWAYS AS … STORED — производное поле, которое БД пересчитывает сама при каждом INSERT/UPDATE. В паре с индексом по выражению — идеальный способ ускорить «частые запросы по производной» без поддержки руками.",
+    examples: [
+      "-- классический пример: нормализация email для регистронезависимого UNIQUE:\nCREATE TABLE users (\n  id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n  email text   NOT NULL,\n  email_norm text GENERATED ALWAYS AS (lower(email)) STORED\n);\n\nCREATE UNIQUE INDEX users_email_norm_uq ON users (email_norm);\n\nINSERT INTO users (email) VALUES ('Alice@Example.com');\nINSERT INTO users (email) VALUES ('alice@example.com');  -- ERROR: duplicate",
+      "-- JSONB: вытащить поле наружу как обычную колонку\n-- (быстрее запросов через ->>'…' и используется в индексе нативно):\nALTER TABLE orders ADD COLUMN status text\n  GENERATED ALWAYS AS (data->>'status') STORED;\nCREATE INDEX orders_status ON orders (status);",
+      "-- альтернатива: индекс по выражению (без хранения):\nCREATE INDEX users_email_lower ON users (lower(email));\n-- query должен повторить выражение дословно:\nSELECT * FROM users WHERE lower(email) = 'alice@example.com';",
+      "-- generated column нельзя задать вручную:\nINSERT INTO users (email, email_norm) VALUES ('a@b', 'x');\n-- ERROR: column \"email_norm\" can only be updated to DEFAULT"
+    ],
+    pitfalls: [
+      "STORED отнимает место (хранится отдельно); VIRTUAL в Postgres ещё не поддерживается (PG 17). Если поле не нужно как индекс — лучше выражение",
+      "Выражение должно быть IMMUTABLE: now(), random(), функции с VOLATILE — нельзя. Postgres откажет на CREATE",
+      "Индекс по выражению работает только если запрос дословно повторяет выражение. lower(email) ≠ LOWER(email::text) в некоторых редких случаях",
+      "При смене формулы нужно DROP COLUMN + ADD COLUMN — ALTER … SET GENERATION пока не работает",
+      "Generated column не передаётся в logical replication по умолчанию — он восстанавливается на реплике через ту же формулу"
+    ],
+    learningGoals: [
+      "решать «регистронезависимый UNIQUE» через generated column + UNIQUE индекс",
+      "вытаскивать поля из jsonb в индексируемые колонки",
+      "отличать generated column от индекса по выражению"
+    ],
+    relatedTopics: ["expression-index", "types-jsonb", "constraints", "sr-zero-downtime-migrations"]
+  },
+
+  "sr-idle-in-transaction": {
+    title: "idle_in_transaction и lifecycle сессий",
+    summary: "Сессия, открывшая транзакцию и заснувшая (приложение зависло на сетевом вызове, дебагер на брейкпойнте), держит её часами — и тормозит VACUUM, удерживает row-locks, копит WAL. Это самая частая «тихая» проблема в проде.",
+    examples: [
+      "-- защита кластера от спящих транзакций:\nALTER SYSTEM SET idle_in_transaction_session_timeout = '5min';\nALTER SYSTEM SET statement_timeout = '30s';\nALTER SYSTEM SET lock_timeout = '5s';\nSELECT pg_reload_conf();",
+      "-- найти текущих «спящих в транзакции»:\nSELECT pid, usename, application_name, client_addr,\n       state, age(now(), xact_start) AS xact_age,\n       query\nFROM   pg_stat_activity\nWHERE  state = 'idle in transaction'\n   AND xact_start < now() - interval '1 min'\nORDER  BY xact_start;",
+      "-- грохнуть зависшую транзакцию:\nSELECT pg_cancel_backend(12345);    -- мягкая отмена текущего запроса\nSELECT pg_terminate_backend(12345); -- разорвать соединение",
+      "-- хорошая практика — приложение задаёт application_name:\nSET application_name = 'migration-runner';\n-- видно в pg_stat_activity, в логах, в pg_stat_statements"
+    ],
+    pitfalls: [
+      "idle in transaction ≠ idle. Первое — открытая транзакция без активного запроса, опасно. Второе — закрытое соединение, нормально",
+      "idle_in_transaction_session_timeout появился в PG 9.6. До него — только мониторить и убивать вручную",
+      "Глобальный statement_timeout — палка о двух концах: чинит запросы, но может прибить миграцию посередине. Лучше per-сессия / per-роль",
+      "lock_timeout без SET LOCAL живёт всю сессию — pgbouncer + transaction-режим может потерять, потому что сбрасывает на DISCARD ALL",
+      "Длинная транзакция в PgBouncer transaction-pooling-режиме = занят серверный коннект до её конца. Это утечка соединений"
+    ],
+    learningGoals: [
+      "настраивать idle_in_transaction_session_timeout / statement_timeout / lock_timeout",
+      "находить долгие транзакции через pg_stat_activity",
+      "понимать, почему длинные транзакции тормозят VACUUM"
+    ],
+    relatedTopics: ["sr-pg-locks-waits", "sr-mvcc-snapshot", "sr-wraparound-freeze", "cfg-max-connections", "sr-pgbouncer"]
+  },
+
+  "sr-toast": {
+    title: "TOAST и сжатие значений",
+    summary: "Когда значение в строке больше 2 КБ, Postgres хранит его не в основной таблице, а в TOAST-таблице — обычно сжатым. Это работает «само», пока ты не упрёшься в его цену: TOAST-чтение медленнее обычного, и сжатие выбирается по умолчанию (с PG 14 можно lz4).",
+    examples: [
+      "-- TOAST-таблица создаётся автоматически для любой таблицы\n-- с varlena-полями (text, jsonb, bytea, arrays).\nSELECT c.relname AS table_name,\n       t.relname AS toast_name,\n       pg_size_pretty(pg_relation_size(c.oid)) AS heap,\n       pg_size_pretty(pg_relation_size(t.oid)) AS toast\nFROM   pg_class c\nJOIN   pg_class t ON t.oid = c.reltoastrelid\nWHERE  c.relname = 'docs';",
+      "-- стратегия хранения колонки:\nSELECT attname, attstorage\nFROM   pg_attribute\nWHERE  attrelid = 'docs'::regclass AND attnum > 0;\n-- p (plain)    — не TOAST'ить\n-- e (external) — TOAST'ить, не сжимать\n-- m (main)     — сжимать, но в основной таблице\n-- x (extended) — сжимать + TOAST'ить (по умолчанию для varlena)\n\nALTER TABLE docs ALTER COLUMN body SET STORAGE EXTERNAL;",
+      "-- алгоритм сжатия (PG 14+):\nALTER TABLE docs ALTER COLUMN body SET COMPRESSION lz4;\nALTER SYSTEM SET default_toast_compression = 'lz4';\n-- pglz — старый дефолт, безопасный\n-- lz4  — быстрее декомпрессии в 2–3 раза, сравнимая степень сжатия",
+      "-- увидеть, что лежит в TOAST:\nSELECT pg_column_size(body) AS stored_bytes,\n       octet_length(body)  AS uncompressed\nFROM   docs LIMIT 5;"
+    ],
+    pitfalls: [
+      "Любая выборка TOAST-поля = JOIN с TOAST-таблицей по неявному idx. Если в выборке тонна крупных jsonb/text — это I/O-боттлнек, скрытый от тебя",
+      "SET STORAGE EXTERNAL отключает сжатие — полезно, когда данные уже сжаты (картинки, gzip-blob)",
+      "lz4 доступен только если Postgres собран с поддержкой (--with-lz4). Managed-облака обычно поддерживают",
+      "Старые строки в lz4 не пересжимаются — нужно UPDATE или pg_repack. Новые INSERT/UPDATE — да",
+      "pg_column_size возвращает сжатый размер; octet_length — несжатый. Разница и есть выигрыш от компрессии"
+    ],
+    learningGoals: [
+      "понимать, что TOAST — отдельная таблица, и видеть её размер",
+      "выбирать стратегию хранения (plain/external/main/extended)",
+      "знать разницу pglz vs lz4 и когда переключаться"
+    ],
+    relatedTopics: ["types-jsonb", "types-bytea", "sr-bloat"]
+  },
+
+  "sr-bloat": {
+    title: "Bloat и pg_repack",
+    summary: "Bloat — это не dead tuples (их убирает VACUUM), а пустые слоты в страницах, которые VACUUM не возвращает в ФС. Если 50% таблицы — пустота, индексы тоже распухли, чтения дороже. Чистится через VACUUM FULL или pg_repack/pg_squeeze.",
+    examples: [
+      "-- pgstattuple: точное измерение bloat (без эвристик):\nCREATE EXTENSION IF NOT EXISTS pgstattuple;\n\nSELECT * FROM pgstattuple('orders');\n-- table_len, tuple_count, dead_tuple_count, free_space, free_percent\n\nSELECT * FROM pgstattuple_approx('orders');  -- быстрее, без полного скана",
+      "-- bloat в индексах:\nSELECT * FROM pgstatindex('idx_orders_user_created');\n-- leaf_pages, internal_pages, empty_pages, avg_leaf_density",
+      "-- pg_repack — упаковать без блокировки записи:\n-- (требует расширения pg_repack + утилиту-клиент)\npg_repack -d app -t orders --jobs=4\npg_repack -d app --no-superuser-check --index idx_orders_user_created",
+      "-- VACUUM FULL — тоже упаковывает, но БЛОКИРУЕТ таблицу полностью\n-- (ACCESS EXCLUSIVE). Только в окно обслуживания:\nVACUUM (FULL, VERBOSE) orders;"
+    ],
+    pitfalls: [
+      "Bloat растёт там, где много UPDATE/DELETE и HOT не работает. Лечится не VACUUM, а VACUUM FULL / pg_repack",
+      "VACUUM FULL = ACCESS EXCLUSIVE = блокирует таблицу под чтение и запись. На проде — только pg_repack",
+      "pg_repack делает копию таблицы, пишет туда параллельно через триггер, потом меняет местами. Нужен дополнительный диск ≈ размер таблицы",
+      "После pg_repack индексы тоже перепакованы. Если репликация streaming — реплика тоже получит",
+      "Эвристики bloat (вроде check_postgres.pl или query из вики) — приблизительные. Для точных цифр — pgstattuple"
+    ],
+    learningGoals: [
+      "отличать dead tuples от bloat",
+      "измерять bloat через pgstattuple",
+      "применять pg_repack без даунтайма"
+    ],
+    relatedTopics: ["vacuum-basic", "sr-hot-updates", "sr-wraparound-freeze", "sr-index-concurrently"]
+  },
+
+  "sr-wraparound-freeze": {
+    title: "Transaction wraparound и VACUUM FREEZE",
+    summary: "Postgres нумерует транзакции 32-битным xid; когда счётчик пробегает по кругу, БД остановится, чтобы не потерять данные. FREEZE — операция, которая помечает старые строки как «вечные» и сдвигает дедлайн.",
+    examples: [
+      "-- сколько xid осталось до wraparound у твоей БД:\nSELECT datname,\n       age(datfrozenxid) AS xid_age,\n       2^31 - age(datfrozenxid) AS xid_left\nFROM   pg_database\nORDER  BY xid_age DESC;",
+      "-- какие таблицы ближе всех к freeze-лимиту:\nSELECT relname,\n       age(relfrozenxid) AS xid_age,\n       pg_size_pretty(pg_table_size(oid)) AS size\nFROM   pg_class\nWHERE  relkind IN ('r','t','m') AND age(relfrozenxid) > 100000000\nORDER  BY age(relfrozenxid) DESC\nLIMIT  20;",
+      "-- ускорить freeze на горячих таблицах:\nALTER TABLE events SET (autovacuum_freeze_max_age = 200000000);\nVACUUM (FREEZE, VERBOSE) events;\n\n-- глобальные ручки:\nSHOW autovacuum_freeze_max_age;  -- по умолчанию 200M\nSHOW vacuum_freeze_min_age;      -- 50M",
+      "-- аварийный режим — Postgres перешёл в read-only:\n-- ERROR:  database is not accepting commands to avoid wraparound data loss\n-- Решение: подключиться single-user-mode и сделать VACUUM FREEZE\n-- postgres --single -D /var/lib/postgresql/16/main app\n-- backend> VACUUM FREEZE;"
+    ],
+    pitfalls: [
+      "Long-running transaction = freeze не двигается. Активная транзакция держит xid_horizon, и autovacuum не может пометить более новые tuples как замороженные",
+      "VACUUM FREEZE может занять часы на крупных таблицах; запускать в окне обслуживания или через VACUUM (FREEZE, FAST = true) на PG 16+",
+      "При приближении к 1B (миллиард) xid Postgres начинает кричать в логах. К 2B — переводит БД в read-only. Игнорить нельзя",
+      "autovacuum_freeze_max_age на write-heavy таблицах часто стоит снизить, чтобы freeze шёл регулярно, а не одним большим всплеском"
+    ],
+    learningGoals: [
+      "понимать, зачем существует FREEZE и почему он нужен",
+      "мониторить age(datfrozenxid) и age(relfrozenxid)",
+      "знать порядок действий при приближении к wraparound"
+    ],
+    relatedTopics: ["vacuum-basic", "cfg-autovacuum", "sr-mvcc-snapshot", "sr-idle-in-transaction"]
+  },
+
+  "sr-hot-updates": {
+    title: "HOT-updates и FILLFACTOR",
+    summary: "UPDATE в Postgres = INSERT нового tuple + пометка старого как мёртвого. HOT-update — оптимизация, при которой Postgres держит цепочку в одной странице и не трогает индексы. Это то, что превращает «write-heavy таблицу» из «постоянная боль» в «нормально работает».",
+    examples: [
+      "-- условие HOT: (1) обновляемые колонки не входят ни в один индекс,\n--               (2) на странице есть место под новый tuple.\n-- освободить место помогает fillfactor — оставляем зазор при INSERT:\nCREATE TABLE counters (\n  id    bigint PRIMARY KEY,\n  value bigint NOT NULL,\n  ts    timestamptz NOT NULL DEFAULT now()\n) WITH (fillfactor = 70);\n\n-- для существующей таблицы:\nALTER TABLE counters SET (fillfactor = 70);\n-- старые страницы перепакуются на REINDEX/VACUUM FULL/pg_repack.",
+      "-- посчитать долю HOT-апдейтов:\nSELECT relname,\n       n_tup_upd      AS total_upd,\n       n_tup_hot_upd  AS hot_upd,\n       round(100.0 * n_tup_hot_upd / NULLIF(n_tup_upd, 0), 1) AS hot_pct\nFROM   pg_stat_user_tables\nORDER  BY n_tup_upd DESC\nLIMIT  20;",
+      "-- индекс убил HOT? Посмотри, какие колонки он покрывает:\nSELECT i.indexrelid::regclass AS index,\n       array_agg(a.attname ORDER BY x.ordinality) AS cols\nFROM   pg_index i\nJOIN   pg_class c ON c.oid = i.indrelid\nJOIN   unnest(i.indkey) WITH ORDINALITY x(attnum, ordinality) ON true\nJOIN   pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = x.attnum\nWHERE  c.relname = 'counters'\nGROUP  BY i.indexrelid;"
+    ],
+    pitfalls: [
+      "Любой индекс на обновляемой колонке = HOT отключён для этого UPDATE; цепочка tuples будет ходить по индексам, индексы пухнут",
+      "fillfactor 100 (по умолчанию) = места под HOT нет, write-heavy таблица сразу теряет HOT. Для write-heavy счётчиков — 70–80",
+      "fillfactor применяется только к НОВЫМ страницам; для старых нужен VACUUM FULL или pg_repack, и оба требуют ACCESS EXCLUSIVE",
+      "Для индекса fillfactor по умолчанию 90 — не путать с табличным"
+    ],
+    learningGoals: [
+      "видеть долю HOT-апдейтов в pg_stat_user_tables",
+      "подбирать fillfactor под write-нагрузку",
+      "понимать, почему «лишний индекс» — это не бесплатно"
+    ],
+    relatedTopics: ["sr-mvcc-snapshot", "sr-bloat", "sr-index-concurrently", "vacuum-basic"]
+  },
+
+  "sr-statistics-target": {
+    title: "Статистика и default_statistics_target",
+    summary: "ANALYZE строит гистограммы распределения значений в колонках, и от их детальности зависит, насколько точно планировщик угадает количество строк. Слишком грубо → плохие планы; слишком детально → ANALYZE тормозит.",
+    examples: [
+      "-- глобальный дефолт (100). Для крупных таблиц или горячих колонок поднимают до 500–1000:\nSHOW default_statistics_target;\nALTER SYSTEM SET default_statistics_target = 200;\nSELECT pg_reload_conf();",
+      "-- per-column настройка — точечно там, где планировщик ошибается:\nALTER TABLE orders ALTER COLUMN status SET STATISTICS 1000;\nANALYZE orders;\n\n-- посмотреть, что лежит в статистике:\nSELECT attname, n_distinct, most_common_vals, most_common_freqs\nFROM   pg_stats\nWHERE  tablename = 'orders' AND attname = 'status';",
+      "-- если планировщик путается на коррелирующих колонках (city + zip):\nCREATE STATISTICS s_orders_geo (dependencies, ndistinct)\n  ON city, zip FROM orders;\nANALYZE orders;",
+      "-- ручной ANALYZE после большой загрузки:\nANALYZE VERBOSE orders;     -- обновит статистику конкретной таблицы\nVACUUM ANALYZE orders;      -- VACUUM + ANALYZE одной командой"
+    ],
+    pitfalls: [
+      "После массовой загрузки (COPY, restore) обязательно ANALYZE — autovacuum дойдёт через минуты, а до этого планировщик слепой",
+      "Поднять default_statistics_target до 1000 глобально — выстрел в ногу: ANALYZE станет долгим, pg_statistic распухнет",
+      "n_distinct в pg_stats иногда неточен (отрицательное значение — отношение к числу строк, не абсолют). Можно зафиксировать вручную: ALTER COLUMN … SET (n_distinct = ...)",
+      "Расширенная статистика (CREATE STATISTICS) — единственный способ сказать планировщику «эти колонки коррелируют»"
+    ],
+    learningGoals: [
+      "понимать связь default_statistics_target и качества планов",
+      "лечить мисс-эстимейт через SET STATISTICS и CREATE STATISTICS",
+      "знать, когда нужен ручной ANALYZE"
+    ],
+    relatedTopics: ["analyze", "stats-extended", "selectivity", "sr-explain-deep"]
+  },
+
+  "sr-parallel-query": {
+    title: "Параллельные планы",
+    summary: "С PG 9.6 один запрос может использовать несколько CPU. Это бесплатно для аналитики, бесполезно для OLTP и иногда вредно при перегрузке.",
+    examples: [
+      "-- основные ручки:\nSHOW max_parallel_workers;            -- бюджет на весь кластер\nSHOW max_parallel_workers_per_gather; -- максимум на один запрос\nSHOW min_parallel_table_scan_size;    -- ниже этого порога parallel не включится\nSHOW parallel_setup_cost;             -- штраф за запуск воркеров",
+      "-- посмотреть, что планировщик решил параллелить:\nEXPLAIN (ANALYZE, VERBOSE)\nSELECT user_id, sum(total)\nFROM   orders\nWHERE  created_at >= now() - interval '30 days'\nGROUP  BY user_id;\n-- ищи в плане: Gather, Parallel Seq Scan, Parallel Hash Join, Workers Launched",
+      "-- временно отключить для конкретного запроса:\nSET LOCAL max_parallel_workers_per_gather = 0;\nSELECT ...;",
+      "-- расширить под аналитический отчёт:\nSET LOCAL max_parallel_workers_per_gather = 4;\nSET LOCAL parallel_tuple_cost = 0.01;\nSELECT ...;"
+    ],
+    pitfalls: [
+      "OLTP-запросы (точечный SELECT по PK) параллелизм только замедляет — стоимость запуска воркеров больше выигрыша",
+      "Parallel-aware узлы НЕ все: триггеры, функции с VOLATILE, CTE-MATERIALIZED, CURSOR — отрубают параллелизм",
+      "Worker process = отдельное соединение к Postgres. На занятом кластере параллелизм быстро упирается в max_worker_processes",
+      "Workers Launched: 0 в EXPLAIN — планировщик решил параллелить, но мест не нашлось. Не путать с «не хотел»"
+    ],
+    learningGoals: [
+      "включать/выключать параллелизм для конкретного запроса",
+      "читать Gather / Parallel Seq Scan в EXPLAIN",
+      "оценивать, окупится ли параллелизм для конкретной нагрузки"
+    ],
+    relatedTopics: ["sr-explain-deep", "sr-planner-knobs", "sr-pg-stat-statements"]
+  },
+
+  "sr-wal-checkpoints": {
+    title: "WAL и контрольные точки",
+    summary: "Каждое изменение сначала пишется в WAL (write-ahead log), и только потом разрешён COMMIT. Без понимания этого нельзя ни тюнить запись, ни читать графики I/O.",
+    examples: [
+      "SHOW wal_level;          -- minimal / replica / logical\nSHOW checkpoint_timeout; -- частота автоматических чекпойнтов\nSHOW max_wal_size;       -- мягкий лимит, после которого чекпойнт срабатывает раньше",
+      "-- настройки записи WAL\nALTER SYSTEM SET wal_compression = on;       -- сжатие full-page writes\nALTER SYSTEM SET checkpoint_timeout = '15min';\nALTER SYSTEM SET max_wal_size = '8GB';\nALTER SYSTEM SET checkpoint_completion_target = 0.9;\nSELECT pg_reload_conf();",
+      "-- архивация WAL (для PITR и реплик)\nALTER SYSTEM SET archive_mode = on;\nALTER SYSTEM SET archive_command = 'pgbackrest --stanza=main archive-push %p';\n-- посмотреть текущий LSN и сколько WAL накоплено:\nSELECT pg_current_wal_lsn(),\n       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')) AS wal_total;",
+      "-- стрим WAL с реплики или backup-узла:\npg_receivewal -h primary -U replicator -D /backup/wal --slot=wal_receiver"
+    ],
+    pitfalls: [
+      "Чекпойнт пишет ВСЕ грязные страницы на диск — это пик I/O. Слишком частые чекпойнты убивают пропускную способность; слишком редкие — увеличивают время recovery после сбоя",
+      "Full-page writes: первое изменение страницы после чекпойнта пишется в WAL целиком, не дельтой. wal_compression сжимает эти страницы — на HDD-проде даёт +20–30% TPS бесплатно",
+      "wal_keep_size без слотов: если реплика отстаёт и старый WAL ротировался — реплика навсегда сломалась и нужен basebackup заново. С replication slot — primary не выкинет WAL, но рискует забить диск",
+      "archive_command должен быть НАДЁЖНЫМ: если он падает, Postgres хранит WAL и в итоге останавливает запись. Простой rsync без --partial может оставить полуфайл"
+    ],
+    learningGoals: [
+      "читать pg_stat_bgwriter и понимать частоту чекпойнтов",
+      "настраивать checkpoint_timeout / max_wal_size без всплесков I/O",
+      "выбирать между wal_keep_size и replication slot"
+    ],
+    relatedTopics: ["sr-explain-deep", "sr-replication", "sr-backup-pitr", "cfg-checkpoint", "cfg-wal-level"]
+  },
+
+  "sr-pg-locks-waits": {
+    title: "pg_locks и wait events",
+    summary: "Кто кого ждёт и почему. Классы блокировок от AccessShare (SELECT) до AccessExclusive (DROP/ALTER), и pg_stat_activity.wait_event как первый шаг диагностики «всё тормозит».",
+    examples: [
+      "-- кто что держит и кто чего ждёт прямо сейчас:\nSELECT a.pid, a.usename, a.state, a.wait_event_type, a.wait_event,\n       a.query, age(now(), a.xact_start) AS xact_age,\n       l.mode, l.relation::regclass, l.granted\nFROM   pg_stat_activity a\nLEFT JOIN pg_locks l ON l.pid = a.pid\nWHERE  a.state <> 'idle' OR l.pid IS NOT NULL\nORDER  BY a.xact_start NULLS LAST;",
+      "-- классическая цепочка блокировок (кто кого блокирует):\nSELECT blocked.pid AS blocked_pid,\n       blocked.query AS blocked_query,\n       blocking.pid AS blocking_pid,\n       blocking.query AS blocking_query\nFROM   pg_stat_activity blocked\nJOIN   pg_stat_activity blocking ON blocking.pid = ANY(pg_blocking_pids(blocked.pid))\nWHERE  blocked.wait_event_type = 'Lock';",
+      "-- защита от мёртвых блокировок:\nSET LOCAL lock_timeout = '2s';        -- падать, если не получил лок за 2 сек\nSET LOCAL deadlock_timeout = '500ms'; -- как часто проверять deadlock\nSET LOCAL statement_timeout = '30s';  -- ограничить весь запрос"
+    ],
+    pitfalls: [
+      "AccessExclusive (DROP, ALTER без CONCURRENTLY, VACUUM FULL) блокирует ВСЁ — даже SELECT — выстраивая за собой очередь. Под нагрузкой это инцидент",
+      "Long-running transaction = пробка: держит row-locks и не даёт VACUUM убирать мёртвые tuples. Идём через pg_stat_activity по xact_start",
+      "Wait event ≠ блокировка строки. ClientRead — ждём от клиента, LWLock:BufferContent — внутренний лок Postgres, IO:DataFileRead — диск. Тип проблемы разный",
+      "lock_timeout без SET LOCAL — настройка сессии; чаще ставят на отдельный мигратор, а не глобально"
+    ],
+    learningGoals: [
+      "читать pg_locks и связку через pg_blocking_pids",
+      "отличать row-level lock от relation-level и от wait_event",
+      "пользоваться lock_timeout / statement_timeout для миграций"
+    ],
+    relatedTopics: ["locks", "sr-mvcc-snapshot", "sr-advisory-locks", "err-deadlock"]
+  },
+
   "sr-mvcc-snapshot": {
     title: "MVCC и снимки",
     summary: "xmin/xmax, видимость строк, snapshot isolation.",
@@ -2397,6 +2843,28 @@ export const topics = {
   },
 
   // --- indexes.html ---
+  "sr-index-concurrently": {
+    title: "CREATE INDEX CONCURRENTLY и REINDEX CONCURRENTLY",
+    summary: "В проде индекс строится только так. Без CONCURRENTLY команда блокирует таблицу на запись на всё время постройки — а это могут быть часы.",
+    examples: [
+      "-- безопасное создание под нагрузкой:\nCREATE INDEX CONCURRENTLY idx_orders_user_created\n  ON orders (user_id, created_at DESC);\n\n-- проверка, что индекс валиден:\nSELECT relname, indisvalid, indisready\nFROM   pg_class c\nJOIN   pg_index i ON i.indexrelid = c.oid\nWHERE  relname = 'idx_orders_user_created';",
+      "-- если построение упало (например, по UNIQUE-конфликту) — остался INVALID-индекс:\nSELECT c.relname\nFROM   pg_index i\nJOIN   pg_class c ON c.oid = i.indexrelid\nWHERE  NOT i.indisvalid;\n\nDROP INDEX CONCURRENTLY idx_orders_user_created;\nCREATE INDEX CONCURRENTLY idx_orders_user_created ON orders (user_id, created_at DESC);",
+      "-- перестроить распухший индекс без блокировки чтения:\nREINDEX INDEX CONCURRENTLY idx_orders_user_created;\nREINDEX TABLE CONCURRENTLY orders;          -- все индексы таблицы\nREINDEX SCHEMA CONCURRENTLY public;         -- все индексы схемы"
+    ],
+    pitfalls: [
+      "CONCURRENTLY делает 2 прохода по таблице и ждёт окончания всех параллельных транзакций — постройка длиннее обычной в 2–3 раза, но без блокировки",
+      "Нельзя внутри транзакции (BEGIN/COMMIT) — Postgres откажет. Только отдельным statement",
+      "Если упало — остался INVALID-индекс, он НЕ используется планировщиком, но место занимает. Найти его и дропнуть — отдельная задача дежурного",
+      "REINDEX CONCURRENTLY появился только в PG 12. На 11 и старше — стандартный костыль: CREATE NEW + DROP OLD + RENAME"
+    ],
+    learningGoals: [
+      "строить индекс под нагрузкой без даунтайма",
+      "находить и чистить INVALID-индексы",
+      "знать, когда REINDEX действительно нужен (bloat, corruption)"
+    ],
+    relatedTopics: ["create-index-btree", "composite-index", "sr-zero-downtime-migrations", "sr-bloat"]
+  },
+
   "composite-index": {
     title: "Составные индексы (несколько колонок)",
     summary: "Один индекс по нескольким столбцам и правило «leftmost prefix».",

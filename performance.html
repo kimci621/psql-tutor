@@ -82,6 +82,76 @@ LIMIT  20;</pre>
       <h2>Гнём планировщик</h2>
       <p class="sub">Когда план «не такой» — обычно дело не в багах планировщика, а в его представлении о железе и памяти.</p>
 
+      <article class="topic" id="sr-wal-checkpoints">
+        <h3>WAL и контрольные точки</h3>
+        <p class="summary">Каждое изменение сначала идёт в WAL (write-ahead log), и только потом разрешён COMMIT. Без этого нельзя ни тюнить запись, ни читать графики I/O.</p>
+        <div class="code-block">
+          <pre>SHOW wal_level;            -- minimal / replica / logical
+SHOW checkpoint_timeout;   -- частота автоматических чекпойнтов
+SHOW max_wal_size;         -- мягкий лимит, после которого чекпойнт срабатывает раньше
+
+-- типовая настройка под write-нагрузку:
+ALTER SYSTEM SET wal_compression = on;              -- +20–30% TPS на HDD
+ALTER SYSTEM SET checkpoint_timeout = '15min';
+ALTER SYSTEM SET max_wal_size = '8GB';
+ALTER SYSTEM SET checkpoint_completion_target = 0.9;
+SELECT pg_reload_conf();
+
+-- сколько WAL накопилось и где мы сейчас по LSN:
+SELECT pg_current_wal_lsn(),
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), '0/0')) AS wal_total;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-wal-checkpoints">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Чекпойнт</strong> — момент, когда все «грязные» страницы сбрасываются на диск. Слишком частые — пик I/O в середине рабочего дня; слишком редкие — долгое recovery после сбоя.</li>
+            <li><strong>Full-page writes:</strong> первое изменение страницы после чекпойнта попадает в WAL целиком. <code>wal_compression = on</code> сжимает эти страницы — почти бесплатный выигрыш.</li>
+            <li><strong>archive_command</strong> должен быть надёжен: если он падает, Postgres копит WAL и в итоге останавливает запись. Простой <code>rsync</code> без <code>--partial</code> может оставить полуфайл — лучше pgBackRest или WAL-G.</li>
+            <li>На <a href="backups.html">бэкапах и PITR</a> WAL — основной материал; на <a href="replication.html">репликации</a> — поток между primary и репликой.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-parallel-query">
+        <h3>Параллельные планы</h3>
+        <p class="summary">С PG 9.6 один запрос может использовать несколько CPU. Это бесплатно для аналитики, бесполезно для OLTP, иногда вредно при перегрузке.</p>
+        <div class="code-block">
+          <pre>SHOW max_parallel_workers;             -- бюджет на весь кластер
+SHOW max_parallel_workers_per_gather;  -- максимум на один запрос
+SHOW min_parallel_table_scan_size;     -- ниже этого порога — без параллелизма
+
+-- посмотреть, что планировщик решил параллелить:
+EXPLAIN (ANALYZE, VERBOSE)
+SELECT user_id, sum(total)
+FROM   orders
+WHERE  created_at &gt;= now() - interval '30 days'
+GROUP  BY user_id;
+-- ищи в плане: Gather, Parallel Seq Scan, Parallel Hash Join, Workers Launched
+
+-- расширить под аналитический отчёт:
+SET LOCAL max_parallel_workers_per_gather = 4;
+SET LOCAL parallel_tuple_cost = 0.01;
+SELECT ...;
+
+-- выключить для конкретного запроса:
+SET LOCAL max_parallel_workers_per_gather = 0;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-parallel-query">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>OLTP-запросы (точечный SELECT по PK) параллелизм только замедляет — стоимость запуска воркеров больше выигрыша.</li>
+            <li>Parallel-aware узлы — не все. Триггеры, функции <code>VOLATILE</code>, CTE-MATERIALIZED, CURSOR — отрубают параллелизм для всего запроса.</li>
+            <li><code>Workers Launched: 0</code> — планировщик решил параллелить, но мест в общем бюджете не нашлось. Не путать с «не хотел».</li>
+          </ul>
+        </div>
+      </article>
+
       <article class="topic" id="sr-planner-knobs">
         <h3>Настройки планировщика</h3>
         <p class="summary"><code>work_mem</code>, <code>effective_cache_size</code>, <code>random_page_cost</code>.</p>

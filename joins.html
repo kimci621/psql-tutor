@@ -311,6 +311,67 @@ CREATE TABLE user_profile (
       </article>
     </section>
 
+    <section class="category">
+      <h2>4. Иерархии: дерево комментариев, категории, оргструктура</h2>
+      <p class="sub">Три способа хранить дерево: <strong>parent_id</strong> + recursive CTE, <strong>materialized path</strong> через ltree, <strong>closure table</strong>. У каждого свой профиль чтения и записи — выбор зависит от того, что важнее.</p>
+
+      <article class="topic" id="sr-hierarchies">
+        <h3>parent_id, ltree и closure table</h3>
+        <p class="summary">Тот же домен — три способа хранения. Видеть это сравнение — то, что отличает senior-понимание схемы от наивного.</p>
+        <div class="code-block">
+          <pre>-- 1) Adjacency list (parent_id) — простой и общий:
+CREATE TABLE categories (
+  id        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  parent_id bigint REFERENCES categories(id),
+  name      text NOT NULL
+);
+
+-- все потомки узла #1:
+WITH RECURSIVE descendants AS (
+  SELECT id, parent_id, name, 1 AS depth
+  FROM   categories WHERE id = 1
+  UNION ALL
+  SELECT c.id, c.parent_id, c.name, d.depth + 1
+  FROM   categories c
+  JOIN   descendants d ON c.parent_id = d.id
+)
+SELECT * FROM descendants;
+
+-- 2) Materialized path через ltree:
+CREATE EXTENSION IF NOT EXISTS ltree;
+CREATE TABLE categories_mp (
+  id   bigint PRIMARY KEY,
+  path ltree NOT NULL,           -- '1.4.7.42'
+  name text NOT NULL
+);
+CREATE INDEX idx_mp_path ON categories_mp USING gist (path);
+
+SELECT * FROM categories_mp WHERE path &lt;@ '1.4.7';   -- все потомки
+SELECT * FROM categories_mp WHERE path @&gt; '1.4.7.42'; -- все предки
+
+-- 3) Closure table — отдельная таблица «предок-потомок» для каждой пары:
+CREATE TABLE categories_closure (
+  ancestor   bigint NOT NULL,
+  descendant bigint NOT NULL,
+  depth      int    NOT NULL,
+  PRIMARY KEY (ancestor, descendant)
+);</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-hierarchies">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>parent_id + recursive CTE</strong> — самый общий, но «все потомки на 10 уровней вглубь» дорого. Хорош, если читаем поддерево редко.</li>
+            <li><strong>Materialized path (ltree)</strong> — чтение поддерева одним запросом, запись дороже (move узла = update всех потомков).</li>
+            <li><strong>Closure table</strong> — быстрейшее чтение «все предки/потомки», запись = O(глубина). Поддерживается триггерами.</li>
+            <li>Никогда не делать DFS/BFS на стороне приложения через N запросов — WITH RECURSIVE в БД всегда дешевле.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
     <section class="category exercises-section" id="exercises">
       <h2>Упражнения</h2>
       <p class="sub">Использует учебный датасет (<a href="index.html#dataset">скачать</a>). Сначала попробуй сам, потом проверь решение или разбери с ИИ.</p>

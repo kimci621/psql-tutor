@@ -117,7 +117,55 @@
     </section>
 
     <section class="category">
-      <h2>6. Связанные темы</h2>
+      <h2>6. Нормализация и денормализация</h2>
+      <p class="sub">Нормализация защищает от противоречий: каждый факт в одном месте. Денормализация — осознанный шаг назад ради чтения. Кто умеет говорить и то, и другое не путая — у того схема выживает.</p>
+
+      <article class="topic" id="sr-normalization">
+        <h3>1NF–3NF и когда отступать от них</h3>
+        <p class="summary">Три формы — на пальцах, с типичными нарушениями. И EAV — антипаттерн, в который часто скатываются «гибкие схемы».</p>
+        <div class="code-block">
+          <pre>-- 1NF: все колонки атомарны
+-- НАРУШЕНИЕ:  posts.tags = 'sql,db,postgres'
+-- НОРМА:      post_tags (post_id, tag) с составным PK
+
+-- 2NF: неключевые колонки зависят от ВСЕГО PK
+-- НАРУШЕНИЕ:
+CREATE TABLE order_items (
+  order_id int, product_id int, qty int,
+  product_name text,     -- зависит только от product_id
+  PRIMARY KEY (order_id, product_id)
+);
+-- НОРМА: product_name → в products
+
+-- 3NF: неключевые колонки не зависят от других неключевых
+-- НАРУШЕНИЕ: users (id, country_code, country_name)
+-- НОРМА:     countries (code PK, name); users (..., country_code FK)
+
+-- денормализация — осознанная, под конкретный запрос:
+ALTER TABLE users ADD COLUMN orders_count int NOT NULL DEFAULT 0;
+-- актуальность держит триггер на INSERT/DELETE в orders.
+
+-- EAV-антипаттерн (избегать):
+-- attributes (entity_id, key, value) — невозможно типизировать и индексировать.
+-- Гибкая схема → jsonb или нормальные колонки.</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-normalization">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>«Денормализация для производительности»</strong> в 80% случаев — оправдание плохих индексов. Сначала EXPLAIN, потом денормализация.</li>
+            <li><strong>EAV</strong> (entity-attribute-value) — антипаттерн: нельзя типизировать, нельзя индексировать, JOIN на каждый запрос. Плавающая схема → <code>jsonb</code> или нормальная схема.</li>
+            <li>Денормализованное поле требует синхронизации (триггер / MV / приложение). Забудешь — данные разъедутся.</li>
+            <li>Materialized view — это тоже денормализация, только декларативная. <code>REFRESH MATERIALIZED VIEW CONCURRENTLY</code> делает её приемлемой для прода.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>7. Связанные темы</h2>
       <article class="topic concept">
         <h3>Где ещё</h3>
         <div class="desc">

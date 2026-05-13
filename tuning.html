@@ -327,7 +327,182 @@ effective_io_concurrency = 200</pre>
     </section>
 
     <section class="category">
-      <h2>6. Связанные темы</h2>
+      <h2>6. Статистика для планировщика</h2>
+      <p class="sub">ANALYZE строит гистограммы распределения значений. Качество планов прямо зависит от детальности этих гистограмм. Здесь — глобальная настройка и точечные ручки.</p>
+
+      <article class="topic" id="sr-statistics-target">
+        <h3>Статистика и default_statistics_target</h3>
+        <p class="summary">Слишком грубо → плохие планы; слишком детально → ANALYZE тормозит и pg_statistic распухает. Истина — между.</p>
+        <div class="code-block">
+          <pre>-- глобальный дефолт (100). Для крупных БД поднимают до 200–500:
+SHOW default_statistics_target;
+ALTER SYSTEM SET default_statistics_target = 200;
+SELECT pg_reload_conf();
+
+-- per-column настройка — точечно там, где планировщик ошибается:
+ALTER TABLE orders ALTER COLUMN status SET STATISTICS 1000;
+ANALYZE orders;
+
+-- что лежит в статистике конкретной колонки:
+SELECT attname, n_distinct, most_common_vals, most_common_freqs
+FROM   pg_stats
+WHERE  tablename = 'orders' AND attname = 'status';
+
+-- если планировщик путается на коррелирующих колонках:
+CREATE STATISTICS s_orders_geo (dependencies, ndistinct)
+  ON city, zip FROM orders;
+ANALYZE orders;
+
+-- ручной ANALYZE после массовой загрузки — обязателен:
+VACUUM ANALYZE orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-statistics-target">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>После <code>COPY</code> или <code>pg_restore</code> autovacuum дойдёт через минуты — до этого планировщик слепой. Делай <code>ANALYZE</code> вручную.</li>
+            <li>Глобальный <code>default_statistics_target = 1000</code> — выстрел в ногу: <code>ANALYZE</code> станет долгим, <code>pg_statistic</code> распухнет. Лучше точечный <code>SET STATISTICS</code> на горячих колонках.</li>
+            <li><strong>Расширенная статистика</strong> (<code>CREATE STATISTICS</code>) — единственный способ сказать планировщику «эти колонки коррелируют» (город ↔ индекс).</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>7. HOT-updates и FILLFACTOR</h2>
+      <p class="sub">UPDATE в Postgres — это INSERT нового tuple + пометка старого как мёртвого. HOT-update — оптимизация, благодаря которой индексы не трогаются. Это разница между «write-heavy таблица — постоянная боль» и «всё нормально».</p>
+
+      <article class="topic" id="sr-hot-updates">
+        <h3>HOT-updates и FILLFACTOR</h3>
+        <p class="summary">Условие HOT: обновляемые колонки не входят ни в один индекс + на странице есть место под новый tuple. Зазор обеспечивает <code>fillfactor</code>.</p>
+        <div class="code-block">
+          <pre>-- write-heavy счётчик — задаём fillfactor с зазором:
+CREATE TABLE counters (
+  id    bigint PRIMARY KEY,
+  value bigint NOT NULL,
+  ts    timestamptz NOT NULL DEFAULT now()
+) WITH (fillfactor = 70);
+
+-- для существующей таблицы:
+ALTER TABLE counters SET (fillfactor = 70);
+-- старые страницы перепакуются на VACUUM FULL / pg_repack.
+
+-- посчитать долю HOT-апдейтов:
+SELECT relname,
+       n_tup_upd     AS total_upd,
+       n_tup_hot_upd AS hot_upd,
+       round(100.0 * n_tup_hot_upd / NULLIF(n_tup_upd, 0), 1) AS hot_pct
+FROM   pg_stat_user_tables
+ORDER  BY n_tup_upd DESC
+LIMIT  20;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-hot-updates">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Любой индекс</strong> на обновляемой колонке отключает HOT для этого UPDATE — цепочка ходит по индексам, и они пухнут. Поэтому «лишний индекс» не бесплатен.</li>
+            <li><code>fillfactor = 100</code> (по умолчанию) — нет места под HOT. Для write-heavy таблиц <strong>70–80</strong>.</li>
+            <li><code>fillfactor</code> применяется к НОВЫМ страницам. Для старых — VACUUM FULL или pg_repack.</li>
+            <li>Для индексов <code>fillfactor</code> по умолчанию 90 — не путать с табличным.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>8. Transaction wraparound и VACUUM FREEZE</h2>
+      <p class="sub">Postgres нумерует транзакции 32-битным xid. Когда счётчик пробегает по кругу, БД переходит в read-only, чтобы не потерять данные. FREEZE двигает этот дедлайн.</p>
+
+      <article class="topic" id="sr-wraparound-freeze">
+        <h3>Transaction wraparound и VACUUM FREEZE</h3>
+        <p class="summary">Каждый администратор Postgres должен знать, как мониторить <code>age(datfrozenxid)</code> и что делать, когда БД ушла в аварийный read-only.</p>
+        <div class="code-block">
+          <pre>-- сколько xid осталось до wraparound:
+SELECT datname,
+       age(datfrozenxid) AS xid_age,
+       2^31 - age(datfrozenxid) AS xid_left
+FROM   pg_database
+ORDER  BY xid_age DESC;
+
+-- какие таблицы ближе всех к freeze-лимиту:
+SELECT relname,
+       age(relfrozenxid) AS xid_age,
+       pg_size_pretty(pg_table_size(oid)) AS size
+FROM   pg_class
+WHERE  relkind IN ('r','t','m') AND age(relfrozenxid) &gt; 100000000
+ORDER  BY age(relfrozenxid) DESC
+LIMIT  20;
+
+-- ускорить freeze на горячих таблицах:
+ALTER TABLE events SET (autovacuum_freeze_max_age = 200000000);
+VACUUM (FREEZE, VERBOSE) events;
+
+-- аварийный режим (БД в read-only):
+-- postgres --single -D /var/lib/postgresql/16/main app
+-- backend&gt; VACUUM FREEZE;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-wraparound-freeze">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Long-running transaction</strong> = freeze не двигается. Активная транзакция держит <code>xid_horizon</code>, autovacuum не может замораживать новее.</li>
+            <li>VACUUM FREEZE на крупной таблице — часы. Запускай в окне обслуживания.</li>
+            <li>При 1B xid Postgres кричит в логах; при 2B — переводит БД в read-only. Игнорить нельзя.</li>
+            <li>На write-heavy таблицах <code>autovacuum_freeze_max_age</code> стоит снизить — чтобы freeze шёл регулярно, а не одним всплеском.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>9. Bloat и pg_repack</h2>
+      <p class="sub">Dead tuples убирает VACUUM, но пустые слоты в страницах не возвращаются в файловую систему. Если 50% таблицы — пустота, индексы тоже распухли. Чистится через VACUUM FULL или pg_repack.</p>
+
+      <article class="topic" id="sr-bloat">
+        <h3>Измерение и упаковка bloat</h3>
+        <p class="summary">pgstattuple — точное измерение без эвристик. pg_repack — упаковка без блокировки записи.</p>
+        <div class="code-block">
+          <pre>-- pgstattuple: измерить bloat точно
+CREATE EXTENSION IF NOT EXISTS pgstattuple;
+
+SELECT * FROM pgstattuple('orders');
+-- table_len, tuple_count, dead_tuple_count, free_space, free_percent
+
+SELECT * FROM pgstattuple_approx('orders'); -- быстрее, без полного скана
+
+-- bloat в индексах:
+SELECT * FROM pgstatindex('idx_orders_user_created');
+-- leaf_pages, empty_pages, avg_leaf_density
+
+-- pg_repack — упаковка без блокировки записи (нужно расширение + cli):
+-- pg_repack -d app -t orders --jobs=4
+
+-- VACUUM FULL — БЛОКИРУЕТ таблицу (ACCESS EXCLUSIVE), только в окно обслуживания:
+VACUUM (FULL, VERBOSE) orders;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-bloat">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Bloat растёт там, где много UPDATE/DELETE и HOT не работает. Обычный VACUUM не помогает — нужна упаковка.</li>
+            <li><strong>VACUUM FULL</strong> блокирует таблицу полностью. На проде — только <code>pg_repack</code>: делает копию через триггер, потом меняет местами.</li>
+            <li>pg_repack нужен дополнительный диск ≈ размер таблицы. Индексы тоже перепакуются.</li>
+            <li>Эвристики bloat из википедии — приблизительные. Для точных цифр — <code>pgstattuple</code>.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>10. Связанные темы</h2>
       <article class="topic concept">
         <h3>Где ещё</h3>
         <div class="desc">

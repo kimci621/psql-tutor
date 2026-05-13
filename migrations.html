@@ -56,6 +56,57 @@ ALTER TABLE users VALIDATE CONSTRAINT users_email_norm_nn;
       </article>
     </section>
 
+    <section class="category">
+      <h2>Идемпотентность операций</h2>
+      <p class="sub">Любая надёжная распределённая система рано или поздно делает один и тот же запрос дважды. Идемпотентность — это когда второй раз ничего не происходит. Тот же принцип спасает миграции, повторённые после провала.</p>
+
+      <article class="topic" id="sr-idempotency">
+        <h3>UNIQUE + ON CONFLICT и idempotency-ключ</h3>
+        <p class="summary">Основной инструмент Postgres для идемпотентных вставок. И — антипаттерн, которого надо избегать.</p>
+        <div class="code-block">
+          <pre>-- идемпотентный INSERT через ON CONFLICT DO NOTHING:
+INSERT INTO orders (id, user_id, total, idempotency_key)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (idempotency_key) DO NOTHING
+RETURNING id;
+-- если ничего не вернулось — запись уже была.
+
+-- идемпотентный UPSERT — НЕ через сложение:
+INSERT INTO inventory (sku, in_stock) VALUES ($1, $2)
+ON CONFLICT (sku) DO UPDATE SET in_stock = EXCLUDED.in_stock;
+-- (DO UPDATE SET in_stock = inventory.in_stock + EXCLUDED.in_stock — НЕ идемпотентно)
+
+-- идемпотентные миграции через таблицу-журнал:
+CREATE TABLE schema_migrations (
+  version    text PRIMARY KEY,
+  applied_at timestamptz NOT NULL DEFAULT now()
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM schema_migrations
+                 WHERE version = '2026_05_13_add_email_norm') THEN
+    ALTER TABLE users ADD COLUMN email_norm text;
+    INSERT INTO schema_migrations (version)
+    VALUES ('2026_05_13_add_email_norm');
+  END IF;
+END$$;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-idempotency">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Самый частый антипаттерн:</strong> <code>in_stock + EXCLUDED.in_stock</code> — выглядит как UPSERT, но повтор удваивает значение.</li>
+            <li><code>ON CONFLICT (col)</code> требует UNIQUE-индекс на <code>col</code>. Без него — синтаксическая ошибка.</li>
+            <li>Идемпотентность по <strong>бизнес-ключу</strong> важнее, чем по PK: PK генерится автоматически и не совпадает между повторами.</li>
+            <li>Без <code>RETURNING</code> невозможно отличить «вставили» от «уже было» — для логов и аналитики критично.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
   </main>
 </div>
 </body>

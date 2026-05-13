@@ -265,7 +265,61 @@ server_reset_query = DISCARD ALL</pre>
     </section>
 
     <section class="category">
-      <h2>8. Связанные темы</h2>
+      <h2>8. Time-series в Postgres</h2>
+      <p class="sub">Постгрес справляется с миллиардами event-строк, если правильно расставить три кирпича: <strong>partition by range(ts)</strong>, <strong>BRIN-индекс на ts</strong>, и <strong>автоматизация ротации</strong> через pg_partman. Для серьёзной аналитики поверх — TimescaleDB.</p>
+
+      <article class="topic" id="sr-time-series">
+        <h3>Партиции + BRIN + pg_partman</h3>
+        <p class="summary">Append-only event-stream — идеальный кейс для BRIN-индекса и автоматической ротации партиций.</p>
+        <div class="code-block">
+          <pre>-- партиционированная таблица по месяцам:
+CREATE TABLE events (
+  id   bigint GENERATED ALWAYS AS IDENTITY,
+  ts   timestamptz NOT NULL,
+  user_id bigint NOT NULL,
+  data jsonb,
+  PRIMARY KEY (id, ts)
+) PARTITION BY RANGE (ts);
+
+CREATE TABLE events_2026_05 PARTITION OF events
+  FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+
+-- BRIN — идеален для append-only по времени:
+CREATE INDEX idx_events_ts_brin ON events USING brin (ts)
+  WITH (pages_per_range = 32);
+
+-- pg_partman — автоматическая ротация:
+CREATE EXTENSION IF NOT EXISTS pg_partman;
+
+SELECT partman.create_parent(
+  p_parent_table => 'public.events',
+  p_control      => 'ts',
+  p_type         => 'range',
+  p_interval     => '1 month',
+  p_premake      => 4
+);
+
+-- TimescaleDB — гиперт-таблицы и continuous aggregates:
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+SELECT create_hypertable('events', 'ts', chunk_time_interval => interval '1 day');</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-time-series">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>BRIN работает только на физически отсортированных данных — для append-only это естественно. На таблице с UPDATE в произвольном порядке BRIN бесполезен.</li>
+            <li>Партиционирование без ротации = таблиц станут тысячи, планы тяжёлые. pg_partman автоматизирует, но его cron должен реально запускаться.</li>
+            <li>TimescaleDB добавляет hypertable + continuous aggregates. Лицензия open core; в managed-сервисах есть не всегда.</li>
+            <li>На write-heavy time-series autovacuum часто отстаёт — поднимай <code>scale_factor</code> и <code>naptime</code>.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>9. Связанные темы</h2>
       <article class="topic concept">
         <h3>Где ещё про эксплуатацию</h3>
         <div class="desc">

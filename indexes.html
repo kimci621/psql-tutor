@@ -262,7 +262,52 @@ GROUP  BY user_id;</pre>
     </section>
 
     <section class="category">
-      <h2>6. Связанные темы</h2>
+      <h2>6. Построение индекса под нагрузкой</h2>
+      <p class="sub">В проде индекс всегда строится через <code>CONCURRENTLY</code>. Иначе команда блокирует таблицу на запись на всё время постройки — а это могут быть часы.</p>
+
+      <article class="topic" id="sr-index-concurrently">
+        <h3>CREATE INDEX CONCURRENTLY и REINDEX CONCURRENTLY</h3>
+        <p class="summary">Безопасное построение без блокировки записи. Цена — два прохода по таблице, время в 2–3 раза дольше обычного.</p>
+        <div class="code-block">
+          <pre>-- безопасное создание под нагрузкой:
+CREATE INDEX CONCURRENTLY idx_orders_user_created
+  ON orders (user_id, created_at DESC);
+
+-- проверка, что индекс валиден:
+SELECT relname, indisvalid
+FROM   pg_class c
+JOIN   pg_index i ON i.indexrelid = c.oid
+WHERE  relname = 'idx_orders_user_created';
+
+-- если построение упало (например, по UNIQUE-конфликту) — остался INVALID:
+SELECT c.relname
+FROM   pg_index i
+JOIN   pg_class c ON c.oid = i.indexrelid
+WHERE  NOT i.indisvalid;
+
+DROP INDEX CONCURRENTLY idx_orders_user_created;
+
+-- перестроить распухший индекс без блокировки чтения:
+REINDEX INDEX CONCURRENTLY idx_orders_user_created;
+REINDEX TABLE CONCURRENTLY orders;          -- все индексы таблицы</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-index-concurrently">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><code>CONCURRENTLY</code> делает 2 прохода и ждёт окончания всех параллельных транзакций — постройка длиннее, но без блокировки записи.</li>
+            <li><strong>Нельзя внутри транзакции</strong> (<code>BEGIN/COMMIT</code>) — отдельным statement.</li>
+            <li>Если упало — остался <strong>INVALID-индекс</strong>: место занимает, планировщик его не использует. Найти через <code>pg_index</code> и дропнуть тоже <code>CONCURRENTLY</code>.</li>
+            <li><code>REINDEX … CONCURRENTLY</code> появился в PG 12. На 11 и старше — паттерн «CREATE NEW + DROP OLD + RENAME».</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>7. Связанные темы</h2>
       <p class="sub">Где ещё на сайте темы, перекликающиеся с индексами.</p>
       <article class="topic concept">
         <h3>Где ещё про индексы</h3>

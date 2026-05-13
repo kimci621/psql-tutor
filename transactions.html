@@ -211,6 +211,39 @@ COMMIT;
       <h2>5. Конкурентность и согласованность</h2>
       <p class="sub">Когда несколько соединений одновременно меняют одни и те же данные, нужны механизмы согласованности поверх просто транзакций. Здесь — MVCC, advisory locks, шина событий внутри БД и outbox-паттерн.</p>
 
+      <article class="topic" id="sr-pg-locks-waits">
+        <h3>pg_locks и wait events</h3>
+        <p class="summary">Кто кого ждёт и почему. Главный инструмент диагностики «всё тормозит» — связка <code>pg_stat_activity.wait_event</code> и <code>pg_locks</code>.</p>
+        <div class="code-block">
+          <pre>-- цепочка: кто кого блокирует прямо сейчас
+SELECT blocked.pid  AS blocked_pid,
+       blocked.query AS blocked_query,
+       blocking.pid AS blocking_pid,
+       blocking.query AS blocking_query
+FROM   pg_stat_activity blocked
+JOIN   pg_stat_activity blocking
+       ON blocking.pid = ANY(pg_blocking_pids(blocked.pid))
+WHERE  blocked.wait_event_type = 'Lock';
+
+-- защита миграций от мёртвых блокировок:
+SET LOCAL lock_timeout       = '2s';     -- падать, если не получил лок
+SET LOCAL deadlock_timeout   = '500ms';  -- как часто проверять deadlock
+SET LOCAL statement_timeout  = '30s';    -- ограничение на весь запрос</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pg-locks-waits">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>AccessExclusive</strong> (DROP, ALTER без CONCURRENTLY, VACUUM FULL) блокирует даже SELECT и выстраивает за собой очередь — под нагрузкой это инцидент.</li>
+            <li><strong>Long-running transaction</strong> = пробка: держит row-locks и не даёт VACUUM убирать мёртвые tuples. Смотреть по <code>xact_start</code> в <code>pg_stat_activity</code>.</li>
+            <li><strong>wait_event ≠ блокировка строки.</strong> <code>ClientRead</code> — ждём клиента, <code>LWLock:BufferContent</code> — внутренний лок, <code>IO:DataFileRead</code> — диск. Тип проблемы разный.</li>
+            <li>На любую миграцию — <code>SET LOCAL lock_timeout</code>. Лучше упасть и повторить, чем заморозить прод.</li>
+          </ul>
+        </div>
+      </article>
+
       <article class="topic" id="sr-mvcc-snapshot">
         <h3>MVCC и снимки</h3>
         <p class="summary">xmin/xmax и видимость строк.</p>
@@ -266,6 +299,85 @@ NOTIFY order_created, '{"id": 42}';</pre>
         </div>
         <div class="desc">
           <p>Сообщения не сохраняются: пропустил подключение — пропустил событие. Хорошо для cache-invalidation; плохо для гарантированной доставки.</p>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-idle-in-transaction">
+        <h3>idle_in_transaction и lifecycle сессий</h3>
+        <p class="summary">Сессия, открывшая транзакцию и заснувшая, тормозит VACUUM, удерживает row-locks, копит WAL. Самая частая «тихая» проблема в проде.</p>
+        <div class="code-block">
+          <pre>-- защита кластера от спящих транзакций:
+ALTER SYSTEM SET idle_in_transaction_session_timeout = '5min';
+ALTER SYSTEM SET statement_timeout = '30s';
+ALTER SYSTEM SET lock_timeout = '5s';
+SELECT pg_reload_conf();
+
+-- найти текущих «спящих в транзакции»:
+SELECT pid, usename, application_name, client_addr,
+       state, age(now(), xact_start) AS xact_age,
+       query
+FROM   pg_stat_activity
+WHERE  state = 'idle in transaction'
+   AND xact_start &lt; now() - interval '1 min'
+ORDER  BY xact_start;
+
+-- грохнуть зависшую:
+SELECT pg_cancel_backend(12345);    -- отменить запрос
+SELECT pg_terminate_backend(12345); -- разорвать соединение</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-idle-in-transaction">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>idle in transaction ≠ idle.</strong> Первое — открытая транзакция без активного запроса, опасно. Второе — нормально.</li>
+            <li>Глобальный <code>statement_timeout</code> — палка о двух концах: может прибить миграцию. Лучше per-сессия / per-роль.</li>
+            <li>В PgBouncer transaction-pooling-режиме длинная транзакция держит серверный коннект до её конца — это утечка пула.</li>
+            <li>Хорошая практика — приложение задаёт <code>application_name</code>: видно в <code>pg_stat_activity</code>, в логах, в <code>pg_stat_statements</code>.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="topic" id="sr-optimistic-locking">
+        <h3>Оптимистичные блокировки и soft delete</h3>
+        <p class="summary">Альтернатива <code>SELECT FOR UPDATE</code>: не блокировать строку, а проверять на UPDATE через <code>version</code> или <code>xmin</code>. На read-heavy сценариях намного дешевле.</p>
+        <div class="code-block">
+          <pre>-- паттерн с явным version-столбцом:
+CREATE TABLE accounts (
+  id      bigint PRIMARY KEY,
+  balance numeric NOT NULL,
+  version int NOT NULL DEFAULT 0
+);
+
+-- транзакция приложения:
+--   1. SELECT balance, version FROM accounts WHERE id = $1;
+--   2. newBalance = balance - 100;
+--   3. UPDATE accounts
+--        SET balance = $newBalance, version = version + 1
+--        WHERE id = $1 AND version = $version;
+--   4. если updated_rows = 0 → кто-то опередил, retry.
+
+-- soft delete вместо физического DELETE:
+ALTER TABLE users ADD COLUMN deleted_at timestamptz;
+
+-- частичный UNIQUE — позволяет переиспользовать email после удаления:
+CREATE UNIQUE INDEX users_email_active_uq
+  ON users (email) WHERE deleted_at IS NULL;
+
+CREATE INDEX users_active ON users (id) WHERE deleted_at IS NULL;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-optimistic-locking">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Требует retry-логики</strong> в приложении. Если её нет — конкурентный update молча «исчезает».</li>
+            <li><code>version</code> и <code>xmin</code> не защищают от write skew на разных строках. Для инварианта «врачей в смене не меньше двух» — SERIALIZABLE.</li>
+            <li><strong>Soft delete:</strong> <code>WHERE deleted_at IS NULL</code> на КАЖДОМ запросе. Забыл — отдал клиенту удалённую запись. Помогают views или RLS.</li>
+            <li><code>xmin</code> сменяется при VACUUM FREEZE — нельзя хранить долго и сравнивать через дни.</li>
+          </ul>
         </div>
       </article>
 

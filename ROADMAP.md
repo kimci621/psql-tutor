@@ -127,41 +127,52 @@
 
 ### Производительность и планировщик (5)
 
-- [ ] **7.1** **WAL и контрольные точки.** Что такое WAL, full-page writes, `checkpoint_timeout`/`max_wal_size`, `wal_compression`, `archive_command`, `pg_receivewal`. На какой странице: `performance.html` или новая. — **M**
-- [ ] **7.2** **pg_locks и wait events.** Классы блокировок (AccessShare → AccessExclusive), `lock_timeout`, `deadlock_timeout`, `pg_stat_activity.wait_event_type`/`wait_event`. — **M**
-- [ ] **7.3** **CREATE INDEX CONCURRENTLY и REINDEX CONCURRENTLY.** Как индексировать без блокировки таблицы; что делать при провале (INVALID-индекс); порядок при миграции. — **S**
-- [ ] **7.4** **Параллельные планы.** parallel-aware nodes, `max_parallel_workers`, `parallel_setup_cost`, когда параллелизм бесполезен (мелкие таблицы, нагруженный CPU). — **S**
-- [ ] **7.5** **Статистика и `default_statistics_target`.** Цена ANALYZE, per-column SET STATISTICS, расширенная статистика для коррелирующих колонок. — **S**
+- [x] **7.1** **WAL и контрольные точки.** Что такое WAL, full-page writes, `checkpoint_timeout`/`max_wal_size`, `wal_compression`, `archive_command`, `pg_receivewal` — на `performance.html`, topic-id `sr-wal-checkpoints` — **M** — 2026-05-13
+- [x] **7.2** **pg_locks и wait events.** Классы блокировок, `lock_timeout`, `deadlock_timeout`, `wait_event_type`/`wait_event`, `pg_blocking_pids` — на `transactions.html`, topic-id `sr-pg-locks-waits` — **M** — 2026-05-13
+- [x] **7.3** **CREATE INDEX CONCURRENTLY и REINDEX CONCURRENTLY.** — на `indexes.html` (новая секция «Построение индекса под нагрузкой»), topic-id `sr-index-concurrently` — **S** — 2026-05-13
+- [x] **7.4** **Параллельные планы.** parallel-aware nodes, `max_parallel_workers_per_gather`, Gather / Parallel Seq Scan, когда параллелизм вредит — на `performance.html`, topic-id `sr-parallel-query` — **S** — 2026-05-13
+- [x] **7.5** **Статистика и `default_statistics_target`.** `SET STATISTICS`, `pg_stats`, `CREATE STATISTICS` — на `tuning.html` (новая секция 6), topic-id `sr-statistics-target` — **S** — 2026-05-13
 
 ### MVCC и эксплуатация (5)
 
-- [ ] **7.6** **HOT-updates и FILLFACTOR.** Когда UPDATE остаётся в той же странице (HOT) и почему это спасает индексы; настройка `fillfactor` под write-heavy таблицы. — **M**
-- [ ] **7.7** **Transaction wraparound и VACUUM FREEZE.** 32-битные xid, `autovacuum_freeze_max_age`, как Postgres защищается и что делать при «vacuum to prevent wraparound». — **M**
-- [ ] **7.8** **Bloat и pg_repack.** Чем bloat отличается от dead tuples; `pgstattuple`, `pg_repack` / `pg_squeeze` для упаковки без блокировки. — **M**
-- [ ] **7.9** **TOAST и сжатие.** Когда значение становится out-of-line, `pglz` vs `lz4` (PG 14+), `ALTER TABLE … SET COMPRESSION`. — **S**
-- [ ] **7.10** **idle_in_transaction и lifecycle сессий.** `idle_in_transaction_session_timeout`, `statement_timeout`, `lock_timeout`, `application_name`. Почему длинные транзакции тормозят VACUUM. — **S**
+- [x] **7.6** **HOT-updates и FILLFACTOR.** Условия HOT, `pg_stat_user_tables.n_tup_hot_upd`, fillfactor под write-heavy — на `tuning.html` (новая секция 7), topic-id `sr-hot-updates` — **M** — 2026-05-13
+- [x] **7.7** **Transaction wraparound и VACUUM FREEZE.** age(datfrozenxid), single-user recovery — на `tuning.html` (новая секция 8), topic-id `sr-wraparound-freeze` — **M** — 2026-05-13
+- [x] **7.8** **Bloat и pg_repack.** pgstattuple, pgstatindex, pg_repack vs VACUUM FULL — на `tuning.html` (новая секция 9), topic-id `sr-bloat` — **M** — 2026-05-13
+- [x] **7.9** **TOAST и сжатие.** External storage, pglz vs lz4, pg_column_size vs octet_length — на `types.html` (новая секция 15), topic-id `sr-toast` — **S** — 2026-05-13
+- [x] **7.10** **idle_in_transaction и lifecycle сессий.** Тайм-ауты, pg_stat_activity, pg_cancel/terminate_backend — на `transactions.html`, topic-id `sr-idle-in-transaction` — **S** — 2026-05-13
 
 ### Прикладные паттерны (3)
 
-- [ ] **7.11** **Generated columns и expression-индексы вместе.** `GENERATED ALWAYS AS … STORED` для нормализованных производных полей и индекс по выражению. — **S**
-- [ ] **7.12** **Optimistic locking.** Поле `version` или использование `xmin` для atomic compare-and-swap; soft delete. — **M**
-- [ ] **7.13** **Идемпотентность операций.** Дедуп через UNIQUE + ON CONFLICT, idempotency-ключ, повторяемые миграции. — **S**
+- [x] **7.11** **Generated columns + expression-индексы.** Регистронезависимый UNIQUE, вытаскивание полей из jsonb — на `types.html` (новая секция 16), topic-id `sr-generated-columns` — **S** — 2026-05-13
+- [x] **7.12** **Optimistic locking + soft delete.** Compare-and-swap через version/xmin, partial unique index — на `transactions.html`, topic-id `sr-optimistic-locking` — **M** — 2026-05-13
+- [x] **7.13** **Идемпотентность операций.** ON CONFLICT DO NOTHING/UPDATE, антипаттерн in_stock+EXCLUDED, journal-table миграции — на `migrations.html`, topic-id `sr-idempotency` — **S** — 2026-05-13
 
 ### Эксплуатация и экосистема (4)
 
-- [ ] **7.14** **Logical decoding и CDC.** `pgoutput`, `wal2json`, `Debezium` — как Postgres превращается в источник событий. Слоты, replica identity. — **M**
-- [ ] **7.15** **Foreign data wrappers (postgres_fdw).** Запрос к чужой БД как к локальной таблице; pushdown ограничений, типичные подводные камни. — **S**
-- [ ] **7.16** **Time-series в Postgres.** BRIN на ts, declarative partitioning + pg_partman, краткий обзор TimescaleDB. — **M**
-- [ ] **7.17** **Экосистема расширений.** PostGIS, pg_partman, pg_cron, pg_audit, hypopg, pgstattuple — что есть и под что. — **S**
+- [x] **7.14** **Logical decoding и CDC.** pgoutput, wal2json, Debezium, REPLICA IDENTITY — на `replication.html`, topic-id `sr-logical-decoding-cdc` — **M** — 2026-05-13
+- [x] **7.15** **Foreign data wrappers (postgres_fdw + file_fdw).** SERVER / USER MAPPING / IMPORT FOREIGN SCHEMA / pushdown — на `tooling.html` (новая секция 5), topic-id `sr-fdw` — **S** — 2026-05-13
+- [x] **7.16** **Time-series в Postgres.** BRIN, pg_partman, TimescaleDB обзор — на `scaling.html` (новая секция 8), topic-id `sr-time-series` — **M** — 2026-05-13
+- [x] **7.17** **Экосистема расширений.** Топ-12, pg_cron job, hypopg для проверки идеи индекса — на `tooling.html` (новая секция 6), topic-id `sr-extensions-ecosystem` — **S** — 2026-05-13
 
 ### Дизайн и тестирование (3)
 
-- [ ] **7.18** **Нормализация и денормализация.** 1NF–3NF на пальцах, мотивы денормализации, EAV-антипаттерн. — **M**
-- [ ] **7.19** **Иерархии в таблице.** Materialized path / closure table / parent_id + WITH RECURSIVE — сравнение под разные сценарии чтения и записи. — **M**
-- [ ] **7.20** **Нагрузочное тестирование: pgbench.** Стандартные сценарии, кастомные `-f` скрипты, чтение TPS-цифр без обмана себя. — **S**
+- [x] **7.18** **Нормализация и денормализация.** 1NF–3NF, денормализация через триггер, EAV-антипаттерн — на `decisions.html` (новая секция 6), topic-id `sr-normalization` — **M** — 2026-05-13
+- [x] **7.19** **Иерархии в таблице.** parent_id + RECURSIVE, ltree, closure table — на `joins.html` (новая секция 4), topic-id `sr-hierarchies` — **M** — 2026-05-13
+- [x] **7.20** **Нагрузочное тестирование: pgbench.** Базовый TPC-B, кастомные `-f` скрипты, read/write микс, PgBouncer-vs-прямое — на `tooling.html` (новая секция 7), topic-id `sr-pgbench` — **S** — 2026-05-13
 
-Итог: 8 S + 12 M ≈ 2–3 спринта работы. После закрытия 7.1–7.20 контент сайта
-будет покрывать senior-уровень эксплуатации PostgreSQL.
+Итог: **спринт 7 закрыт в один день** (2026-05-13). 20 новых тем (`sr-wal-checkpoints`,
+`sr-pg-locks-waits`, `sr-index-concurrently`, `sr-parallel-query`,
+`sr-statistics-target`, `sr-hot-updates`, `sr-wraparound-freeze`, `sr-bloat`,
+`sr-toast`, `sr-idle-in-transaction`, `sr-generated-columns`,
+`sr-optimistic-locking`, `sr-idempotency`, `sr-logical-decoding-cdc`, `sr-fdw`,
+`sr-time-series`, `sr-extensions-ecosystem`, `sr-normalization`,
+`sr-hierarchies`, `sr-pgbench`). Все темы получили summary / examples /
+pitfalls / learningGoals / relatedTopics; новые секции на 8 страницах
+(`performance`, `transactions`, `indexes`, `tuning`, `types`, `migrations`,
+`replication`, `scaling`, `tooling`, `decisions`, `joins`).
+
+Итоговая база: **248** topic-id. Контент сайта покрывает senior-уровень
+эксплуатации PostgreSQL.
 
 ## Спринт 8 — Roadmap-страница и сохранность прогресса
 
@@ -209,3 +220,11 @@
     - learningGoals: 40 тем имели одну цель; всем добавлена вторая по сути темы.
     - В h2-секции `basics`/`joins`/`aggregates`/`indexes` добавлены вступления
       по 2–4 строки (19 секций).
+- 2026-05-13 — Спринт 7 (closing the senior gap) закрыт в один день.
+  20 новых тем добавлено в `topics.js`, новые секции на 8 страницах.
+  Решение по размещению: придерживаемся уже сложившейся таксономии вместо
+  создания страниц «sr-…» — senior-темы должны жить рядом со своими
+  «обычными» соседями (HOT-updates в tuning, CIC в indexes, иерархии в joins).
+  Все 20 topic-id префиксованы `sr-` — чтобы при будущем экспорте по prefix
+  отличать «то, что для senior-уровня» от «то, что для базы».
+  248 topic-id в `topics.js`, 30 HTML, тесты зелёные.

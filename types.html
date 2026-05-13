@@ -513,7 +513,93 @@ INSERT INTO users (email) VALUES ('a@b.co');</pre>
     </section>
 
     <section class="category">
-      <h2>15. Куда ещё посмотреть</h2>
+      <h2>15. TOAST и сжатие</h2>
+      <p class="sub">Когда значение в строке больше ~2 КБ, Postgres хранит его не в основной таблице, а в TOAST-таблице, обычно сжатым. Работает «само» — пока ты не упрёшься в его цену.</p>
+
+      <article class="topic" id="sr-toast">
+        <h3>TOAST: external storage и сжатие</h3>
+        <p class="summary">Любая таблица с varlena-полями (text, jsonb, bytea, array) автоматически получает TOAST-таблицу. С PG 14 есть выбор алгоритма: pglz (старый дефолт) и lz4 (быстрее).</p>
+        <div class="code-block">
+          <pre>-- размер TOAST-таблицы рядом с основной:
+SELECT c.relname AS table_name,
+       pg_size_pretty(pg_relation_size(c.oid)) AS heap,
+       pg_size_pretty(pg_relation_size(t.oid)) AS toast
+FROM   pg_class c
+JOIN   pg_class t ON t.oid = c.reltoastrelid
+WHERE  c.relname = 'docs';
+
+-- стратегия хранения для колонки (extended — по умолчанию):
+ALTER TABLE docs ALTER COLUMN body SET STORAGE EXTERNAL; -- TOAST, без сжатия
+
+-- алгоритм сжатия (PG 14+):
+ALTER TABLE docs ALTER COLUMN body SET COMPRESSION lz4;
+ALTER SYSTEM SET default_toast_compression = 'lz4';
+
+-- размер до и после сжатия:
+SELECT pg_column_size(body) AS stored_bytes,
+       octet_length(body)   AS uncompressed
+FROM   docs LIMIT 5;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-toast">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Любая выборка TOAST-поля = неявный JOIN с TOAST-таблицей. Если в выборке много крупных jsonb/text — скрытый I/O-боттлнек.</li>
+            <li><code>SET STORAGE EXTERNAL</code> отключает сжатие — полезно, если данные уже сжаты (картинки, gzip).</li>
+            <li><code>lz4</code> быстрее декомпрессии в 2–3 раза при сравнимой степени сжатия. Доступен, если Postgres собран с <code>--with-lz4</code>.</li>
+            <li>Старые строки в новый алгоритм не пересжимаются автоматически — только при UPDATE или <code>pg_repack</code>.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>16. Generated columns</h2>
+      <p class="sub">Производное поле, которое БД пересчитывает сама при каждом INSERT/UPDATE. В паре с UNIQUE-индексом — идеальный способ обеспечить инвариант «регистронезависимая уникальность email» без поддержки руками.</p>
+
+      <article class="topic" id="sr-generated-columns">
+        <h3>GENERATED ALWAYS AS … STORED</h3>
+        <p class="summary">Колонка, значение которой вычисляется из других — БД хранит результат и обновляет автоматически.</p>
+        <div class="code-block">
+          <pre>-- регистронезависимый UNIQUE через generated column:
+CREATE TABLE users (
+  id    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email text   NOT NULL,
+  email_norm text GENERATED ALWAYS AS (lower(email)) STORED
+);
+
+CREATE UNIQUE INDEX users_email_norm_uq ON users (email_norm);
+
+INSERT INTO users (email) VALUES ('Alice@Example.com');
+INSERT INTO users (email) VALUES ('alice@example.com'); -- ERROR: duplicate
+
+-- вытаскиваем поле из jsonb наружу как колонку:
+ALTER TABLE orders ADD COLUMN status text
+  GENERATED ALWAYS AS (data-&gt;&gt;'status') STORED;
+CREATE INDEX orders_status ON orders (status);
+
+-- альтернатива: индекс по выражению (без хранения):
+CREATE INDEX users_email_lower ON users (lower(email));
+-- но запрос должен повторить выражение дословно.</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-generated-columns">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>STORED занимает место. VIRTUAL в Postgres ещё не реализован (на момент PG 17). Если поле нужно только для запроса — лучше индекс по выражению.</li>
+            <li>Выражение должно быть <code>IMMUTABLE</code>. <code>now()</code>, <code>random()</code>, <code>VOLATILE</code>-функции не пройдут.</li>
+            <li>Чтобы поменять формулу — DROP COLUMN + ADD COLUMN. <code>ALTER … SET GENERATION</code> не работает.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>17. Куда ещё посмотреть</h2>
       <p class="sub">Что осталось за рамками — узкоспециальные типы и темы, у которых есть свои страницы.</p>
 
       <article class="topic concept" id="types-more">

@@ -189,7 +189,163 @@ ORDER  BY pg_relation_size(i.indexrelid) DESC;</pre>
     </section>
 
     <section class="category">
-      <h2>5. Связанные темы</h2>
+      <h2>5. Foreign Data Wrappers</h2>
+      <p class="sub">FDW делает чужую БД (Postgres, MySQL, файл CSV, MongoDB) частью локального запроса как обычную таблицу. Главный приз — pushdown ограничений на удалённую сторону.</p>
+
+      <article class="topic" id="sr-fdw">
+        <h3>postgres_fdw и file_fdw</h3>
+        <p class="summary">Подключаемся к другой БД через SERVER + USER MAPPING + FOREIGN TABLE. Pushdown — то, ради чего FDW и нужен.</p>
+        <div class="code-block">
+          <pre>-- подключение к другой Postgres:
+CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+
+CREATE SERVER reports_db
+  FOREIGN DATA WRAPPER postgres_fdw
+  OPTIONS (host 'reports.internal', port '5432', dbname 'analytics');
+
+CREATE USER MAPPING FOR app_user
+  SERVER reports_db
+  OPTIONS (user 'app_reader', password '...');
+
+-- массовое создание foreign-таблиц:
+IMPORT FOREIGN SCHEMA public
+  LIMIT TO (orders, line_items)
+  FROM SERVER reports_db INTO ext;
+
+-- запрос — как к обычной таблице:
+SELECT u.email, count(o.id)
+FROM   users u
+LEFT JOIN ext.orders o ON o.user_id = u.id
+GROUP  BY u.email;
+
+-- CSV через file_fdw:
+CREATE EXTENSION IF NOT EXISTS file_fdw;
+CREATE SERVER files FOREIGN DATA WRAPPER file_fdw;
+CREATE FOREIGN TABLE logs (ts text, level text, msg text)
+  SERVER files OPTIONS (filename '/var/log/app.csv', format 'csv', header 'true');</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-fdw">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Pushdown</strong> — главный плюс. Без него JOIN тянет всю удалённую таблицу через сеть. Смотри <code>Remote SQL</code> в <code>EXPLAIN VERBOSE</code>.</li>
+            <li>Транзакционность ОДНОСТОРОННЯЯ: BEGIN на локальной — это не BEGIN на удалённой. Двух-фазный commit FDW не использует.</li>
+            <li>Foreign-таблицы не индексируются локально — фильтры должны pushdown'иться. Если не идёт — переписывай запрос.</li>
+            <li>Не путать с logical replication: FDW — синхронные запросы по требованию; repl — асинхронный поток.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>6. Экосистема расширений</h2>
+      <p class="sub">Postgres сильнее, чем кажется по коробке. Десяток зрелых расширений закрывает геопоиск, time-series, аудит, планирование заданий, гипотетические индексы и точное измерение bloat.</p>
+
+      <article class="topic" id="sr-extensions-ecosystem">
+        <h3>Топ расширений и pg_cron / hypopg</h3>
+        <p class="summary">Не учить наизусть, а знать, что есть и под какую задачу. Установка везде однотипная: <code>CREATE EXTENSION IF NOT EXISTS …</code>.</p>
+        <div class="code-block">
+          <pre>-- общий механизм:
+SELECT * FROM pg_available_extensions ORDER BY name;
+CREATE EXTENSION IF NOT EXISTS extname;
+SELECT * FROM pg_extension;    -- что включено в этой БД
+
+-- топ-набор:
+-- pg_stat_statements  — top тяжёлых запросов
+-- pg_trgm             — fuzzy / подстрочный поиск
+-- pgcrypto            — gen_random_uuid, hashing
+-- citext              — case-insensitive text
+-- postgis             — индустриальный геопоиск
+-- timescaledb         — hypertables для time-series
+-- pg_partman          — ротация партиций
+-- pg_cron             — планировщик задач в БД
+-- pg_repack           — упаковка без блокировки
+-- pgaudit             — аудит DDL/DML
+-- pgstattuple         — точное измерение bloat
+-- hypopg              — гипотетические индексы
+
+-- пример: pg_cron поверх Postgres
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+SELECT cron.schedule(
+  'cleanup-old-events',
+  '0 3 * * *',                                    -- каждый день в 3:00
+  $$ DELETE FROM events WHERE ts &lt; now() - interval '90 days' $$
+);
+
+-- пример: hypopg — проверить индекс ДО создания
+CREATE EXTENSION IF NOT EXISTS hypopg;
+SELECT hypopg_create_index('CREATE INDEX ON orders (user_id, created_at DESC)');
+EXPLAIN SELECT * FROM orders WHERE user_id = 1 ORDER BY created_at DESC;
+SELECT hypopg_reset();</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-extensions-ecosystem">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Managed-сервисы (RDS, Cloud SQL) часто разрешают только whitelisted расширения. Перед миграцией — сверять со списком провайдера.</li>
+            <li><code>CREATE EXTENSION</code> требует SUPERUSER. На managed — отдельная роль или web-консоль.</li>
+            <li><strong>hypopg-индексы НЕ существуют физически</strong> — это инструмент исследования, видны только в EXPLAIN. Реальные запросы они не ускоряют.</li>
+            <li>Каждое расширение = поверхность атаки. На проде — только то, что действительно нужно.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>7. pgbench — нагрузочное тестирование</h2>
+      <p class="sub">Идёт в комплекте с Postgres, готов к работе из коробки. Базовый сценарий хорош для сравнения железа и настроек; кастомные скрипты через <code>-f</code> — для проверки своего профиля нагрузки.</p>
+
+      <article class="topic" id="sr-pgbench">
+        <h3>pgbench: TPS, latency, кастомные сценарии</h3>
+        <p class="summary">Стандартный TPC-B-like сценарий + свой <code>.sql</code> с переменными. Цифры в пресс-релизах надо уметь читать критически.</p>
+        <div class="code-block">
+          <pre># инициализация (scale 100 ≈ 1.6 ГБ данных):
+pgbench -i -s 100 -h localhost -U postgres bench
+
+# базовый прогон: 50 клиентов, 4 потока, 5 минут, отчёт каждые 10 сек:
+pgbench -h localhost -U postgres -c 50 -j 4 -T 300 -P 10 bench
+
+# только чтение:
+pgbench -c 50 -j 4 -T 300 -S bench
+
+# кастомный скрипт под свой профиль (my_bench.sql):
+#   \set uid random(1, 100000)
+#   SELECT * FROM users WHERE id = :uid;
+#   SELECT count(*) FROM orders WHERE user_id = :uid;
+pgbench -c 100 -j 8 -T 300 -f my_bench.sql -P 10 app
+
+# смешанный read/write 90/10:
+pgbench -c 50 -j 4 -T 300 \
+  -f read.sql@9 \
+  -f write.sql@1 \
+  -P 10 app
+
+# через PgBouncer — сравнить с прямым подключением:
+pgbench -h pgbouncer.internal -p 6432 -c 200 -j 16 -T 300 bench</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-pgbench">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li>Сравнивать TPS на разных scale нельзя: <code>-s 1</code> = всё в кеше; <code>-s 1000</code> = реальный диск.</li>
+            <li><strong>TPS pgbench ≠ TPS приложения.</strong> У реального приложения другие запросы, соединения, latency-распределения.</li>
+            <li><code>-c 1 -j 1</code> измеряет сетевой round-trip, а не Postgres. Минимум <code>-c 10 -j 4</code>.</li>
+            <li>Без <code>-P</code> не видно, что TPS просел в середине теста из-за чекпойнта.</li>
+            <li><code>-T 300</code> (5 минут) — минимум; короче — пьяные цифры.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>8. Связанные темы</h2>
       <article class="topic concept">
         <h3>Где ещё</h3>
         <div class="desc">

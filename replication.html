@@ -214,6 +214,51 @@ patronictl -c patroni.yml failover</pre>
       </article>
     </section>
 
+    <section class="category">
+      <h2>Logical decoding и CDC</h2>
+      <p class="sub">Logical decoding превращает WAL в поток событий «строка изменена». На этом строятся CDC-конвейеры (Debezium, wal2json) и кросс-версионная репликация. Без понимания replica identity и слотов это не запустить.</p>
+
+      <article class="topic" id="sr-logical-decoding-cdc">
+        <h3>Logical decoding и Debezium</h3>
+        <p class="summary">Замена событийной шине: каждый INSERT/UPDATE/DELETE превращается в событие, которое подписчик читает через replication-протокол.</p>
+        <div class="code-block">
+          <pre>-- 1. включаем logical-уровень WAL (требует restart):
+ALTER SYSTEM SET wal_level = 'logical';
+ALTER SYSTEM SET max_replication_slots = 10;
+ALTER SYSTEM SET max_wal_senders = 10;
+
+-- 2. replica identity: что попадает в WAL при UPDATE/DELETE
+ALTER TABLE events REPLICA IDENTITY FULL;
+-- DEFAULT  — только PK (по умолчанию)
+-- FULL     — вся старая строка (дорого, но информативно)
+-- USING INDEX idx_name — по выбранному UNIQUE-индексу
+
+-- 3. logical slot через pgoutput (нативный плагин):
+SELECT pg_create_logical_replication_slot('cdc_app', 'pgoutput');
+
+-- или wal2json — события сразу в JSON:
+SELECT pg_create_logical_replication_slot('cdc_json', 'wal2json');
+
+-- 4. для Debezium:
+CREATE PUBLICATION debezium_pub FOR TABLE orders, users;
+CREATE USER debezium WITH REPLICATION PASSWORD '...';
+GRANT SELECT ON orders, users TO debezium;</pre>
+          <div class="code-actions">
+            <button class="btn btn-copy">📋 Копировать</button>
+            <button class="btn" data-topic-id="sr-logical-decoding-cdc">💬 Поучиться с ИИ</button>
+          </div>
+        </div>
+        <div class="desc">
+          <ul>
+            <li><strong>Заброшенный logical slot</strong> — главная причина «диск кончился». Если воркер CDC мёртв, primary копит WAL. Мониторь <code>pg_replication_slots.confirmed_flush_lsn</code>.</li>
+            <li><code>REPLICA IDENTITY DEFAULT</code> + таблица без PK = CDC ловит «событие без before-state». Лечится <code>FULL</code> или <code>USING INDEX</code>.</li>
+            <li><code>REPLICA IDENTITY FULL</code> пишет всю строку в WAL — дорого на write-heavy. Точечно.</li>
+            <li>Logical replication <strong>не передаёт DDL</strong>. ALTER TABLE на источнике — руками на приёмнике.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
   </main>
 </div>
 </body>
