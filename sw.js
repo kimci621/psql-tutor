@@ -6,10 +6,11 @@
 // Версия кэша меняй вручную при значимых изменениях, чтобы у юзеров слетел
 // старый snapshot.
 
-const CACHE_NAME = "psql-tutor-v2";
+const CACHE_NAME = "psql-tutor-v3";
 const PRECACHE = [
   "./",
   "./index.html",
+  "./roadmap.html",
   "./assets/styles.css",
   "./assets/app.js",
   "./assets/topics.js",
@@ -25,6 +26,7 @@ const PRECACHE = [
   "./assets/exercises.js",
   "./assets/quiz.js",
   "./assets/progress.js",
+  "./assets/roadmap.js",
   "./assets/search.js",
   "./assets/toc.js",
 ];

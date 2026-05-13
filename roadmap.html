@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap изучения PostgreSQL</title>
+<link rel="stylesheet" href="assets/styles.css">
+<script type="module" src="assets/app.js?v=20260513"></script>
+<script type="module" src="assets/roadmap.js?v=1"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs">PostgreSQL · Roadmap изучения</div>
+      <button class="btn" id="themeToggle">☀ Светлая</button>
+    </div>
+
+    <h1 class="page-title">Roadmap изучения</h1>
+    <p class="page-lead">
+      Карта всех разделов и тем сайта с твоим прогрессом. Ниже — рекомендация, как
+      учиться, чтобы знания закреплялись, а не выветривались через неделю. Прогресс
+      хранится локально в браузере. Чтобы не потерять его при переустановке или
+      переходе на другой компьютер — экспортируй в файл.
+    </p>
+
+    <section class="category">
+      <h2>Сводка</h2>
+      <div id="rm-summary" class="rm-summary">
+        <div class="rm-summary-block">
+          <div class="rm-summary-num" data-rm="read-pct">0%</div>
+          <div class="rm-summary-label">страниц прочитано</div>
+          <div class="rm-summary-sub" data-rm="read-frac">0 / 0</div>
+        </div>
+        <div class="rm-summary-block">
+          <div class="rm-summary-num" data-rm="practiced-pct">0%</div>
+          <div class="rm-summary-label">попрактиковался</div>
+          <div class="rm-summary-sub" data-rm="practiced-frac">0 / 0</div>
+        </div>
+        <div class="rm-summary-block">
+          <div class="rm-summary-num" data-rm="quiz-pct">0%</div>
+          <div class="rm-summary-label">квизов пройдено</div>
+          <div class="rm-summary-sub" data-rm="quiz-frac">0 / 0</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="category">
+      <h2>Прогресс по трекам</h2>
+      <p class="sub">Два пути: учебный (язык SQL и базовая практика) и прикладной (то, что нужно, чтобы запустить и удерживать БД в проде).</p>
+      <div id="rm-tracks" class="rm-tracks"></div>
+    </section>
+
+    <section class="category">
+      <h2>Карта разделов</h2>
+      <p class="sub">Каждая клетка — страница. Цвет показывает статус: <span class="rm-legend rm-st-todo">не начат</span>, <span class="rm-legend rm-st-read">прочитан</span>, <span class="rm-legend rm-st-practiced">с практикой</span>, <span class="rm-legend rm-st-quiz">+ квиз пройден</span>.</p>
+      <div id="rm-map" class="rm-map"></div>
+    </section>
+
+    <section class="category">
+      <h2>Как учиться</h2>
+      <p class="sub">Не «прочитать всё подряд», а взять одну тему и довести её до автоматизма.</p>
+
+      <article class="topic concept" id="rm-howto">
+        <h3>Рабочий цикл по одной теме</h3>
+        <div class="desc">
+          <ol>
+            <li><strong>Прочти страницу.</strong> Не пытайся всё запомнить — главное понять структуру: что это, зачем, какие есть подводные камни. Поставь галочку «прочитано».</li>
+            <li><strong>Открой «Поучиться с ИИ»</strong> на одной из тем страницы. Ментор объяснит, задаст проверочный вопрос. Не пропускай вопросы — без них чтение не превращается в навык.</li>
+            <li><strong>Сделай упражнения,</strong> если они есть на странице. Сначала своё решение в textarea, потом «Разобрать с ИИ» — он не покажет ответ сразу, он подведёт. Поставь «попрактиковался».</li>
+            <li><strong>Пройди квиз</strong> в конце страницы. 60% — порог зачёта. Если не получилось — вернись к теме, на которой ошибся, и переоткрой её с ментором.</li>
+            <li><strong>Возвращайся через неделю.</strong> Спред-репетишн: то, что усвоилось через 7 дней, остаётся в голове на годы.</li>
+          </ol>
+        </div>
+      </article>
+
+      <article class="topic concept" id="rm-tracks-howto">
+        <h3>Какой трек брать</h3>
+        <div class="desc">
+          <ul>
+            <li><strong>«Основы SQL»</strong> — если впервые работаешь с SQL или PostgreSQL. Линейный путь от <a href="install.html">установки</a> до <a href="programming.html">PL/pgSQL</a>. 2–4 недели по часу в день.</li>
+            <li><strong>«Прод и эксплуатация»</strong> — когда SQL уже комфортен и хочется отвечать за БД в проде. Начинается с <a href="tuning.html">тюнинга</a> и <a href="performance.html">EXPLAIN</a>, заканчивается <a href="app-integration.html">интеграцией Postgres с приложением</a>.</li>
+            <li><strong>Точечно</strong> — открой <a href="cheatsheet.html">шпаргалку</a>, <a href="errors.html">список частых ошибок</a> или используй <kbd>⌘K</kbd> для поиска. Если возникла рабочая задача — гугли на сайте.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="category">
+      <h2>Сохранность прогресса</h2>
+      <p class="sub">Прогресс лежит в <code>localStorage</code> браузера. Это удобно (никаких аккаунтов, ничего не отправляется наружу), но хрупко: чистка истории браузера в режиме «всё» сотрёт прогресс. Поэтому — экспорт в файл.</p>
+
+      <div class="rm-pp">
+        <div class="rm-pp-row">
+          <button class="btn primary" id="rm-export">⤓ Скачать прогресс</button>
+          <span class="rm-pp-hint">Откроется диалог сохранения файла <code>psql-tutor-progress.json</code>. Положи его в надёжное место — рядом с заметками или в облако.</span>
+        </div>
+        <div class="rm-pp-row">
+          <button class="btn" id="rm-import">⤒ Загрузить прогресс</button>
+          <input type="file" id="rm-import-file" accept="application/json,.json" hidden>
+          <span class="rm-pp-hint">Подгружаем JSON из ранее сохранённого файла. Слив идёт «по максимуму»: если в файле страница «прочитана», у тебя — «практика», получишь обе галочки. Квиз — берём тот, где счёт выше.</span>
+        </div>
+        <div class="rm-pp-row">
+          <button class="btn ghost" id="rm-reset">⌫ Сбросить весь прогресс</button>
+          <span class="rm-pp-hint">Сотрёт чекбоксы прочитано/практика, результаты квизов и попытки упражнений. Историю чатов и настройки LLM не трогает. Спросит подтверждение.</span>
+        </div>
+        <div class="rm-pp-status" id="rm-status" aria-live="polite"></div>
+      </div>
+
+      <article class="topic concept" id="rm-export-what">
+        <h3>Что входит в экспорт</h3>
+        <div class="desc">
+          <ul>
+            <li>Чекбоксы «прочитано» / «попрактиковался» по каждой странице.</li>
+            <li>Лучший результат каждого квиза (счёт, общее количество, время прохождения).</li>
+            <li>Сохранённые попытки решения упражнений (текст в textarea).</li>
+          </ul>
+          <p><strong>Не входит:</strong> история чатов с ИИ-ментором (она тяжёлая и может содержать твои черновики), настройки LLM (они привязаны к конкретному компьютеру и LM Studio), выбранная тема оформления.</p>
+        </div>
+      </article>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

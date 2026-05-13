@@ -118,6 +118,57 @@
 - [x] **6.10** Перекомпоновка тем: добавлены вступительные абзацы `<p class="sub">` к 19 h2-секциям на `basics.html`, `joins.html`, `aggregates.html`, `indexes.html` — **S** — 2026-05-13
   - Структура страниц уже была логичной (1.x — 7.x секции с тематическими заголовками). Не хватало человеческих вступлений между h2 и первой карточкой — это и было «наваленностью».
 
+## Спринт 7 — Closing the senior gap
+
+Аудит 2026-05-13: текущие 216 не-упражнительных тем покрывают «середину» уверенно
+(SQL, индексы, транзакции, базовая эксплуатация). Для уровня senior PostgreSQL DBA
+не хватает 20 тем — ниже план. Разбиты по тематическим разделам, в порядке
+важности «снизу вверх».
+
+### Производительность и планировщик (5)
+
+- [ ] **7.1** **WAL и контрольные точки.** Что такое WAL, full-page writes, `checkpoint_timeout`/`max_wal_size`, `wal_compression`, `archive_command`, `pg_receivewal`. На какой странице: `performance.html` или новая. — **M**
+- [ ] **7.2** **pg_locks и wait events.** Классы блокировок (AccessShare → AccessExclusive), `lock_timeout`, `deadlock_timeout`, `pg_stat_activity.wait_event_type`/`wait_event`. — **M**
+- [ ] **7.3** **CREATE INDEX CONCURRENTLY и REINDEX CONCURRENTLY.** Как индексировать без блокировки таблицы; что делать при провале (INVALID-индекс); порядок при миграции. — **S**
+- [ ] **7.4** **Параллельные планы.** parallel-aware nodes, `max_parallel_workers`, `parallel_setup_cost`, когда параллелизм бесполезен (мелкие таблицы, нагруженный CPU). — **S**
+- [ ] **7.5** **Статистика и `default_statistics_target`.** Цена ANALYZE, per-column SET STATISTICS, расширенная статистика для коррелирующих колонок. — **S**
+
+### MVCC и эксплуатация (5)
+
+- [ ] **7.6** **HOT-updates и FILLFACTOR.** Когда UPDATE остаётся в той же странице (HOT) и почему это спасает индексы; настройка `fillfactor` под write-heavy таблицы. — **M**
+- [ ] **7.7** **Transaction wraparound и VACUUM FREEZE.** 32-битные xid, `autovacuum_freeze_max_age`, как Postgres защищается и что делать при «vacuum to prevent wraparound». — **M**
+- [ ] **7.8** **Bloat и pg_repack.** Чем bloat отличается от dead tuples; `pgstattuple`, `pg_repack` / `pg_squeeze` для упаковки без блокировки. — **M**
+- [ ] **7.9** **TOAST и сжатие.** Когда значение становится out-of-line, `pglz` vs `lz4` (PG 14+), `ALTER TABLE … SET COMPRESSION`. — **S**
+- [ ] **7.10** **idle_in_transaction и lifecycle сессий.** `idle_in_transaction_session_timeout`, `statement_timeout`, `lock_timeout`, `application_name`. Почему длинные транзакции тормозят VACUUM. — **S**
+
+### Прикладные паттерны (3)
+
+- [ ] **7.11** **Generated columns и expression-индексы вместе.** `GENERATED ALWAYS AS … STORED` для нормализованных производных полей и индекс по выражению. — **S**
+- [ ] **7.12** **Optimistic locking.** Поле `version` или использование `xmin` для atomic compare-and-swap; soft delete. — **M**
+- [ ] **7.13** **Идемпотентность операций.** Дедуп через UNIQUE + ON CONFLICT, idempotency-ключ, повторяемые миграции. — **S**
+
+### Эксплуатация и экосистема (4)
+
+- [ ] **7.14** **Logical decoding и CDC.** `pgoutput`, `wal2json`, `Debezium` — как Postgres превращается в источник событий. Слоты, replica identity. — **M**
+- [ ] **7.15** **Foreign data wrappers (postgres_fdw).** Запрос к чужой БД как к локальной таблице; pushdown ограничений, типичные подводные камни. — **S**
+- [ ] **7.16** **Time-series в Postgres.** BRIN на ts, declarative partitioning + pg_partman, краткий обзор TimescaleDB. — **M**
+- [ ] **7.17** **Экосистема расширений.** PostGIS, pg_partman, pg_cron, pg_audit, hypopg, pgstattuple — что есть и под что. — **S**
+
+### Дизайн и тестирование (3)
+
+- [ ] **7.18** **Нормализация и денормализация.** 1NF–3NF на пальцах, мотивы денормализации, EAV-антипаттерн. — **M**
+- [ ] **7.19** **Иерархии в таблице.** Materialized path / closure table / parent_id + WITH RECURSIVE — сравнение под разные сценарии чтения и записи. — **M**
+- [ ] **7.20** **Нагрузочное тестирование: pgbench.** Стандартные сценарии, кастомные `-f` скрипты, чтение TPS-цифр без обмана себя. — **S**
+
+Итог: 8 S + 12 M ≈ 2–3 спринта работы. После закрытия 7.1–7.20 контент сайта
+будет покрывать senior-уровень эксплуатации PostgreSQL.
+
+## Спринт 8 — Roadmap-страница и сохранность прогресса
+
+- [x] **8.1** Новая страница `roadmap.html`: визуальная карта всех разделов и тем с per-topic статусами (прочитано / попрактиковался / квиз пройден), рекомендация порядка изучения, прогресс-бары по двум трекам — **M** — 2026-05-13
+- [x] **8.2** `assets/progress.js`: функции `exportProgress()` и `importProgress(json)` — JSON с прогрессом по страницам, баллами квизов и темой. Кнопки «Скачать прогресс» / «Загрузить прогресс» на roadmap-странице — **S** — 2026-05-13
+- [x] **8.3** Прогресс не теряется: при clear-localStorage пользователь увидит предупреждение; импорт сливает свой прогресс с текущим (берёт максимум) — **S** — 2026-05-13
+
 ## Журнал решений
 
 Здесь агент фиксирует значимые отклонения от плана, найденные проблемы, новые задачи. Формат: `YYYY-MM-DD — заметка`.

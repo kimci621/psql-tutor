@@ -67,6 +67,7 @@ const groups = [
   {
     title: "Справочники",
     items: [
+      { href: "roadmap.html", label: "Roadmap и прогресс" },
       { href: "cheatsheet.html", label: "Шпаргалка" },
       { href: "decisions.html", label: "Что выбрать" },
       { href: "errors.html", label: "Частые ошибки" }
@@ -133,3 +134,7 @@ export function renderSidebar(currentPath) {
 // Список всех href из навигации (нормализованных), пригодится для проверок
 // и pre-cache в service worker.
 export const sidebarPages = groups.flatMap(g => g.items.map(it => it.href));
+
+// Группы сайдбара — экспортируем для roadmap-страницы, чтобы
+// нарисовать ту же таксономию визуально.
+export const sidebarGroups = groups;
